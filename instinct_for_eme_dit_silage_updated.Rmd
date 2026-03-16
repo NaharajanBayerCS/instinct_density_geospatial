@@ -1,0 +1,1792 @@
+---
+title: "Untitled"
+output: html_document
+---
+
+# Loading data eme silage instinct data
+
+
+
+
+
+
+
+```{r message=FALSE, warning=FALSE, echo=F}
+set.seed(777)
+library(readr)
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+
+
+
+
+
+files <- list.files(path="/mnt/field_reports_2025/instinct_data/eme_silage/",pattern="*.RData", full.names=TRUE, recursive=FALSE)
+
+points_data=data.frame()
+
+
+for (i in 1:length(files)){
+ 
+  print(files[i])
+  load(files[i])
+  loc_dataset=silage_instinct_data
+  loc_dataset$plot_id = as.character(loc_dataset$plot_id)
+  loc_dataset$Longitude = as.double(as.character(loc_dataset$Longitude))
+  loc_dataset$Latitude = as.double(as.character(loc_dataset$Latitude))
+  #print(dim(t))
+  #t <- readr::read_csv(files[i])
+  #loc_dataset$plot_deactivation_flag = as.integer(loc_dataset$plot_deactivation_flag)
+ #loc_dataset$harvest_date = as.Date(loc_dataset$harvest_date )
+  #loc_dataset$planting_date = as.Date(loc_dataset$planting_date )
+  points_data = bind_rows(points_data, loc_dataset)
+}
+
+
+
+#remove incomplete fields
+unique(points_data$Trial)
+#add the CV flag from JUAN
+points_data_locs = points_data %>% dplyr::select(Trial,Country,Year,`Mega Environment`,Latitude,Longitude) %>% unique()
+
+names(points_data_locs)[4] = "mega_environment"
+
+juan_silage_db_1 = points_data_locs %>% group_by(Trial,Country,Year,mega_environment) %>% summarise(latitude = Latitude[1],longitude = Longitude[1])
+
+names(juan_silage_db_1)[1] = "field"
+names(juan_silage_db_1)[2] = "country"
+names(juan_silage_db_1)[3] = "season"
+
+#write_csv(juan_silage_db_1,"/mnt/data/silage_dit_2023_gps.csv")
+
+#unique(points_data$field_level_CV_flag)
+
+library(stringr)
+
+points_data= points_data %>%
+  mutate_if(is.character, str_trim)
+
+
+
+points_data=as.data.frame(apply(points_data, 2, function(x) gsub('\\s+', '', x)))
+
+
+
+
+
+
+#write_csv(points_data_hybrid_me_summary,"/mnt/data/Corn_grain_DIT_2022_hybrids_summary.csv")
+
+
+#points_data_pmt2 = points_data
+
+
+
+points_data_hybrid_me_summary = points_data %>% group_by(Hybrid) %>% summarise(number_of_seasons=length(unique(Year)),number_of_countries=length(unique(Country)),number_of_locations=length(unique(Trial)),number_of_plots=length(unique(plot_id)),number_of_points=length(unique(harvest_point)),seasons=paste(unique(Year),collapse="; "),countries=paste(unique(Country),collapse="; "),locations=paste(unique(Trial),collapse="; "))
+
+#write_csv(points_data_hybrid_me_summary,"/mnt/field_reports_2023/instinct_version_2_density_curves/rsa_instinct_data_updated/RSA_DIT_2022_hybrids_summary.csv")
+
+#points_data_pmt2 = points_data %>% filter(Boundary_Harvest_flag=="FALSE" & plot_deactivation_flag=="FALSE" & IQR_outlier_field_flag == "FALSE" & plot_density_sd_filter =="FALSE" & plot_buffer_distance_flag=="FALSE" & min_yield_flag =="FALSE" & max_yield_flag=="FALSE" & moisture_flag =="FALSE" & max_speed_flag =="FALSE" & min_speed_flag=="FALSE" & yield_sd_filter == "FALSE"&speed_sd_filter=="FALSE"&inverted_curve_flag=="FALSE"&Not_sufficient_density_flag=="FALSE"&Not_sufficient_density_flag=="FALSE"&plot_yield_sd_filter=="FALSE"&field_level_CV_flag=="FALSE")
+
+
+
+    
+#points_data_pmt2 = points_data_pmt2 %>% unite(hybrid_me_type, hybrid_name,Mega.Environment,protocol_hybrid,sep="__",remove=F)
+
+#me nomenclature
+#points_data_pmt2 = points_data_pmt2 %>% mutate(pmt_mes=ifelse(tested_mes %in% c("ME2B"),"ME2B",ifelse(tested_mes %in% c("ME7","ME6_ME7"),"ME 6/7",ifelse(tested_mes %in% c("ME5_ME4","ME3_ME4","ME4"),"ME 3/4/5","NA"))))
+
+#points_data_pmt2 = points_data_pmt2 %>% unite(me_hybrid_type, Mega.Environment,protocol_hybrid,sep="__",remove=F)
+
+names(points_data)[13] = "dry_yield_t_ha"
+
+names(points_data)[6] = "target_density"
+
+
+points_data$dry_yield_t_ha = as.double(as.character(points_data$dry_yield_t_ha))
+
+points_data$target_density = as.double(as.character(points_data$target_density))
+
+#try global average method
+    points_data = points_data %>% group_by(Trial) %>% mutate(yield_env_1=mean(dry_yield_t_ha,na.rm=T),yield_env=median(dry_yield_t_ha,na.rm=T))
+    
+    names(points_data)[5] = "hybrid_name"
+#try global average method
+    #points_data_pmt2_with_ye_for_instinct = points_data_pmt2_with_ye_for_instinct %>% group_by(field) %>% summarise(yield_env=mean(dry_yield_t_ha,na.rm=T),median_field_yield=median(dry_yield_t_ha,na.rm=T))
+
+#hybrid_me = unique(points_data_pmt2[,c(78,31)])
+
+#hybrid_me = hybrid_me %>% group_by(hybrid_name) %>% mutate(number_of_MEs_tested= length(unique(Mega.Environment)),tested_mes=paste(unique(Mega.Environment), collapse="_"))
+
+
+
+#target_density_by_me = points_data_pmt2 %>% group_by(me_hybrid_type) %>% summarise(number_of_densitites_tested= length(unique(Seeding_rate_target)),target_densitites=paste(sort(unique((Seeding_rate_target))), collapse=", "))
+    
+exclude_trial = c("2023_DIT_SIT8_CM40","2023_DIT_SCZ1","2023_DIT_SCZ2")
+
+points_data = filter(points_data,!Trial %in% exclude_trial) 
+
+ 
+
+ 
+
+#early_silage_2_method_3 = filter(silage_dataset_No_flags_1_data,  final_target_density %in% c(95,110))
+ 
+
+
+
+
+
+
+
+
+  
+#}
+
+
+```
+
+
+# SYLD x Density
+
+```{r message=FALSE, warning=FALSE, echo=F}
+#sub=points_data_pmt2_with_ye_for_instinct %>% filter(hybrid_name == "EV4145") 
+
+
+
+#France focus
+#points_data_pmt2_with_ye_for_instinct = filter(points_data_pmt2_with_ye_for_instinct, country %in% c("france"))
+points_data$Country = as.character(points_data$Country )
+points_data = points_data %>% mutate(Country = ifelse(Country == "czechrepublic","czech republic",Country))
+
+points_data_pmt2_with_ye_for_instinct_summary = points_data %>% group_by(hybrid_name) %>% summarise(number_of_seasons=length(unique(Year)),number_of_locations=length(unique(Trial)),locations = paste(unique(Trial), collapse="; "),countries = paste(unique(Country), collapse="; "),number_of_plots=length(unique(plot_id)),number_of_points=length(unique(harvest_point)))
+
+points_data_pmt2_with_ye_for_instinct = points_data
+
+points_data_pmt2_with_ye_for_instinct$plant_density = points_data_pmt2_with_ye_for_instinct$target_density/1000
+
+points_data_pmt2_with_ye_for_instinct_summary_2 = filter(points_data_pmt2_with_ye_for_instinct_summary, number_of_locations>1)
+
+hybrids = unique(points_data_pmt2_with_ye_for_instinct_summary_2$hybrid_name)
+
+
+all_parameters_df=data.frame()
+for (i in 1:length(hybrids)){
+print(hybrids[i])
+early_silage_2_1 = filter(points_data_pmt2_with_ye_for_instinct, hybrid_name==hybrids[i])
+ 
+#names(early_silage_2_1)[17]="plant_density"
+ 
+#number_of_seasons = length(unique(early_silage_2_1$FIELD_year))
+number_of_locations = length(unique(early_silage_2_1$field))
+#number_of_plots = length(unique(early_silage_2_1$unique_plot_id))
+ 
+model_lm = lm(dry_yield_t_ha~plant_density+ I(plant_density^2)+ I(yield_env)+ I(yield_env*plant_density),data=early_silage_2_1)
+ 
+print(summary(model_lm))
+#mean_field_yield_method_4
+ 
+parameters_reg = as.data.frame(t(summary(model_lm)$coefficients))
+#lm_parameters = as.data.frame(t(summary(model_lm)$coefficients))
+  a = parameters_reg$`(Intercept)`[1]
+  b = parameters_reg$plant_density[1]
+  c = parameters_reg$`I(plant_density^2)`[1]
+  d = parameters_reg$`I(yield_env)`[1]
+ e = parameters_reg$`I(yield_env * plant_density)`[1]
+   pval_b = parameters_reg$plant_density[4]
+  pval_c = parameters_reg$`I(plant_density^2)`[4]
+  pval_d = parameters_reg$`I(yield_env)`[4]
+  pval_e = parameters_reg$`I(yield_env * plant_density)`[4]
+#print(summary(model_lm))
+print(summary(model_lm)$adj.r.squared)
+ 
+parameters_df = data.frame(hybrid_name=hybrids[i],intercept=a, coeff_density=b, coeff_density_sqr=c,coeff_ye=d,coeff_ye_density=e,pvalue_density_coeff=pval_b,pvalue_density_sqr_coeff=pval_c,r_2=summary(model_lm)$r.squared,adj_r_2=summary(model_lm)$adj.r.squared, pvalue_ye=pval_d,pvalue_ye_density=pval_e)
+ 
+early_silage_2_1$predicted_df <- predict(model_lm, early_silage_2_1)
+ 
+#early_silage_2_1_1 = filter(early_silage_2_1, mean_field_yield == min(early_silage_2_1$mean_field_yield) | mean_field_yield == max(early_silage_2_1$mean_field_yield) | mean_field_yield == median(early_silage_2_1$mean_field_yield) )
+ 
+# this is the predicted line of multiple linear regression
+ 
+# model_df = model_df %>% mutate(optimal_density = -coeff_density/(2*coeff_density_sqr),
+#     yld_max = intercept + coeff_density*optimal_density + coeff_density_sqr*optimal_density^2,economic_density = (-1)*(coeff_density-0.023)/(2*coeff_density_sqr),yld_eco = intercept + coeff_density*economic_density + coeff_density_sqr*economic_density^2)
+all_parameters_df = rbind(all_parameters_df,parameters_df)
+}
+
+points_data_pmt2_with_ye_for_instinct_summary_ye = points_data_pmt2_with_ye_for_instinct %>% group_by(hybrid_name) %>% summarise(min_ye = min(yield_env),max_ye=max(yield_env),round_min_ye=round(min_ye,0), round_max_ye=round(max_ye,0))
+
+
+#early_silage_2_1_summary = instinct_data_aman %>% group_by(hybrid) %>% summarise(low_ye=12,low_mid_ye=6,mid_ye=8,mid_high_ye=10,high_ye=14)
+
+#early_silage_2_1_summary = instinct_data_aman %>% group_by(hybrid) %>% summarise(low_ye=12,high_ye=14)
+
+
+#names(early_silage_2_1_summary)[1] = "hybrid_name"
+ 
+
+
+hyd.len = length(hybrids)
+final.bin1.table = NULL
+for(i in sequence(hyd.len)){
+  #temp = data.hy.sub %>% filter(Hybrid==hybrids[i])
+  temp = points_data_pmt2_with_ye_for_instinct_summary_ye %>% filter(hybrid_name==hybrids[i])
+  YE = seq(temp$round_min_ye,temp$round_max_ye,1)
+  #### Made the following change to keep the yield range same as Joo Yoon 3T/Ha to 20T/Ha, commented the previous line
+  #YE = seq(3,20,1)
+  bin1_table = temp
+  for(j in 1:(length(YE)-1)){
+    bin1_table = rbind(bin1_table,temp)
+  }
+  bin1_table$YE = YE
+  final.bin1.table = rbind(final.bin1.table,bin1_table)
+}
+
+lm_test_data = final.bin1.table[,c(1,6)]
+
+lm_test_data_1= lm_test_data%>% crossing(plant_density = seq(70,180,1))
+
+names(lm_test_data_1)[2] = "yield_env"
+#lm_test_data_long = lm_test_data %>% gather(ye_level,mean_field_yield, 2:3)
+
+lm_test_data_1 = inner_join(lm_test_data_1,all_parameters_df)
+ 
+#lm_test_data_long$predicted_yield=predict(model_lm,lm_test_data_long)
+ 
+lm_test_data_1 = lm_test_data_1 %>% mutate(predicted_yield=intercept+coeff_density*plant_density+coeff_density_sqr*plant_density*plant_density+coeff_ye*yield_env+coeff_ye_density*yield_env*plant_density)
+ 
+#domino.science-at-scale.io/u/adatt/EMEA_Corn_Grain_Density_Modelling/view/EMEA_2018-2019_corn_grain_MDmodel.R
+ 
+ 
+lm_test_data_2 = lm_test_data_1 %>% mutate(optimal_density = -(coeff_density+yield_env*coeff_ye_density)/(2*coeff_density_sqr),
+    yld_max = intercept + coeff_density*optimal_density + coeff_density_sqr*optimal_density^2+coeff_ye*yield_env+coeff_ye_density*yield_env*optimal_density,economic_density = (-1)*(coeff_density-0.023+yield_env*coeff_ye_density)/(2*coeff_density_sqr),yld_eco = intercept + coeff_density*economic_density + coeff_density_sqr*economic_density^2+coeff_ye*yield_env+coeff_ye_density*yield_env*economic_density)
+
+#domino.science-at-scale.io/u/jdmuno/PopCornDKC/view/app.R
+getOpt <- function(df, CP, SC){
+  # CP - commodity price
+  # SC - seed cost
+  df$AgOpt = - (df$b_pop + (df$e_ye_pop * df$YE)) / (2*df$c_pop_sq)
+  df$Yld_AgOpt = df$a_intcpt + df$AgOpt * df$b_pop + df$AgOpt**2 *df$c_pop_sq + df$YE * df$d_ye + df$YE * df$AgOpt * df$e_ye_pop
+  df$EcOpt = (SC * 1/80000 * 1000 - df$e_ye_pop*df$YE*CP - df$b_pop*CP) / (2* df$c_pop_sq*CP)
+  df$Yld_EcOpt = df$a_intcpt + df$EcOpt * df$b_pop + df$EcOpt**2 *df$c_pop_sq + df$YE * df$d_ye + df$YE * df$EcOpt * df$e_ye_pop
+  df$EcOpt[(df$EcOpt < df$min_pop * 0.9) | (df$EcOpt > df$max_pop * 1.1)] <- NA
+  df$Yld_EcOpt[is.na(df$EcOpt)] <- NA
+  return(df)
+}
+
+SC=6500
+CP=4000
+
+lm_test_data_2 = lm_test_data_2 %>% mutate(b_star = coeff_density+coeff_ye_density*yield_env,c_star=coeff_density_sqr,a_star = intercept+coeff_ye*yield_env,EcOpt = (SC * 1/80000 * 1000 - coeff_ye_density*yield_env*CP - coeff_density*CP) / (2* coeff_density_sqr*CP),
+  Yld_EcOpt = intercept + EcOpt * coeff_density + EcOpt**2 *coeff_density_sqr + yield_env * coeff_ye + yield_env * EcOpt * coeff_ye_density) 
+ 
+ 
+
+
+optimal_density = unique(lm_test_data_2[,c(1,2,16,17)])
+names(optimal_density)[3] = "plant_density"
+names(optimal_density)[4] = "predicted_yield"
+optimal_density$density_type="Optimal density"
+ 
+economic_density = unique(lm_test_data_2[,c(1,2,18,19)])
+names(economic_density)[3] = "plant_density"
+names(economic_density)[4] = "predicted_yield"
+economic_density$density_type="Slope constrained economic density"
+
+cost_economic_density = unique(lm_test_data_2[,c(1,2,23,24)])
+names(cost_economic_density)[3] = "plant_density"
+names(cost_economic_density)[4] = "predicted_yield"
+cost_economic_density$density_type="Seed cost constrained economic density"
+ 
+#cost_economic_density = unique(lm_test_data_long[,c(1,3,4,24,25)])
+#names(cost_economic_density)[4] = "plant_density"
+#names(cost_economic_density)[5] = "predicted_yield"
+#cost_economic_density$density_type="Seed cost constrained economic density"
+
+#lm_test_data_2$analysis_type = analysis_type
+ 
+optimal_density_1 = rbind(optimal_density,economic_density,cost_economic_density)
+
+#Post density curve QC
+optimal_density_2 = optimal_density_1 %>% filter(density_type=="Optimal density")
+
+optimal_density_2 = optimal_density_2 %>% group_by(hybrid_name) %>% mutate(rank_ye=rank(yield_env))
+
+optimal_density_3 = optimal_density_2 %>% group_by(hybrid_name) %>% mutate(min_ye_level=min(rank_ye), max_ye_level=max(rank_ye))
+
+optimal_density_3_min = optimal_density_3 %>% filter(rank_ye==min_ye_level)
+
+optimal_density_3_max = optimal_density_3 %>% filter(rank_ye==max_ye_level)
+
+optimal_density_3_all = rbind(optimal_density_3_min,optimal_density_3_max)
+
+optimal_density_3_all = optimal_density_3_all %>% mutate(opt_density_type = ifelse(rank_ye==1,"min_opt_density","max_opt_density")) %>% select(hybrid_name,opt_density_type,plant_density) 
+
+optimal_density_3_all = unique(optimal_density_3_all)
+
+optimal_density_3_all %>%
+    spread(opt_density_type, plant_density) %>%
+    mutate("Difference" = max_opt_density - min_opt_density) 
+
+optimal_density_3_all_1 = optimal_density_3_all%>% group_by(hybrid_name)%>% tidyr::spread(opt_density_type,plant_density) %>% mutate(difference=max_opt_density-min_opt_density, curve_quality=ifelse(difference>0,"normal","abnormal"))
+
+hybrids = filter(optimal_density_3_all_1,curve_quality=="normal")$hybrid_name
+
+all_parameters_df_1 = inner_join(all_parameters_df,points_data_pmt2_with_ye_for_instinct_summary)
+
+all_parameters_df_1 = filter(all_parameters_df_1,coeff_density_sqr<0)
+
+
+# defining confidence levels
+
+all_parameters_df_1 = all_parameters_df_1 %>% mutate(two_seasons_tested = ifelse(number_of_seasons>1, "TRUE", "FALSE"), atleast_ten_locations_tested= ifelse(number_of_locations>=10, "TRUE", "FALSE"),atleast_five_locations_tested= ifelse(number_of_locations>=5, "TRUE", "FALSE"),atleast_three_locations_tested= ifelse(number_of_locations>=3, "TRUE", "FALSE"))
+ 
+all_parameters_df_1 = all_parameters_df_1 %>% mutate(r2_atleast_0.8 = ifelse(adj_r_2>=0.8, "TRUE", "FALSE"), r2_atleast_0.6= ifelse(adj_r_2>=0.6, "TRUE", "FALSE"),r2_atleast_0.4= ifelse(adj_r_2>=0.4, "TRUE", "FALSE"),r2_atleast_0.2= ifelse(adj_r_2>=0.2, "TRUE", "FALSE"))
+
+confidence_unique_levels = unique(all_parameters_df_1[,c(18:25)])
+
+#defining confidence_level
+
+
+
+#write_csv(confidence_unique_levels,"/mnt/data/confidence_unique_levels.csv")
+
+#confidence_level_def = read_csv("/mnt/data/confidence__levels_definition_grain_dit.csv")
+
+#confidence_level_def = confidence_level_def %>% unite(flags_combined, two_seasons_tested,atleast_ten_locations_tested,atleast_five_locations_tested,atleast_three_locations_tested,r2_atleast_0.8,r2_atleast_0.6,r2_atleast_0.4,r2_atleast_0.2, sep="__",remove=F)
+#confidence_level_def_1 = confidence_level_def[,c(1,10)]
+ 
+#defining confidence levels for hybrids tested for 2 seasons
+
+#two_seasons_tested	atleast_ten_locations_tested	atleast_five_locations_tested	atleast_three_locations_tested	r2_atleast_0.8	r2_atleast_0.6	r2_atleast_0.4	r2_atleast_0.2
+#TRUE	TRUE	TRUE	TRUE	TRUE	TRUE	TRUE	TRUE	Very high
+
+#all_parameters_df_1 = all_parameters_df_1 %>% unite(flags_combined, two_seasons_tested,atleast_ten_locations_tested,atleast_five_locations_tested,atleast_three_locations_tested,r2_atleast_0.8,r2_atleast_0.6,r2_atleast_0.4,r2_atleast_0.2, sep="__",remove=F)
+
+#all_parameters_df_1 = inner_join(all_parameters_df_1,confidence_level_def_1)
+
+all_parameters_df_1 = all_parameters_df_1 %>% mutate(confidence_level = ifelse(two_seasons_tested=="FALSE" & r2_atleast_0.6 == "TRUE","medium","low"))
+
+all_parameters_df_1_normal = filter(all_parameters_df_1, hybrid_name %in% hybrids)
+
+#all_parameters_df_1_normal = all_parameters_df_1
+
+lm_test_data_2_normal = filter(lm_test_data_2, hybrid_name %in% hybrids)
+
+# lm_test_data_2_normal = lm_test_data_2
+#data = filter(lm_test_data_2, hybrid_name=="DKC77-26BR")
+#opt_data = filter(optimal_density_1, hybrid_name=="DKC77-26BR")
+#summary_data = filter(all_parameters_df_1,hybrid_name=="DKC77-26BR")
+ 
+#
+
+hybrids = unique(lm_test_data_2_normal$hybrid_name)
+
+for(i in 1:length(hybrids)){
+  print(hybrids[i])
+  
+  data = filter(lm_test_data_2, hybrid_name==hybrids[i])
+opt_data = filter(optimal_density_1, hybrid_name==hybrids[i])
+summary_data = filter(all_parameters_df_1,hybrid_name==hybrids[i])
+ 
+plot_model_1=ggplot(data, aes(x = plant_density, y = predicted_yield, color=as.factor(yield_env))) +
+  geom_line( aes(x=plant_density, y=predicted_yield,color=as.factor(yield_env)))+ggtitle(paste(hybrids[i],"- Density curve",sep=""))+facet_wrap(~hybrid_name)+geom_point(data=opt_data,aes(x=plant_density,y=predicted_yield,shape=density_type),size=3)+xlab("Planting Density (1K seeds/ha)")+ylab("SYLD Dry Yield (t/ha)")+labs(title = paste("Hybrid = ", hybrids[i],"; ","Seasons = ",summary_data$number_of_seasons,"; ","locations = ",summary_data$number_of_locations,";","plots = ", summary_data$number_of_plots,"; ","points = ", summary_data$number_of_points,"; ","Adj R2 = ",round(data$adj_r_2[1],2),"; ","Conf level = ",summary_data$confidence_level,sep=""))+ggsave(paste("/mnt/field_reports_2025/instinct_results/eme_silage/density_curves/",hybrids[i], "_","INSTINCT_density_curve",".pdf",sep=""), width = 25, height = 20, units = "cm")
+
+
+print(plot_model_1)
+  
+}
+
+
+
+##not normal density curves
+# hybrids_weird = filter(optimal_density_3_all_1,!curve_quality=="normal")$hybrid_name
+# 
+# for(i in 1:length(hybrids_weird)){
+#   print(hybrids_weird[i])
+#   
+#   data = filter(lm_test_data_2, hybrid_name==hybrids_weird[i])
+# opt_data = filter(optimal_density_1, hybrid_name==hybrids_weird[i])
+# summary_data = filter(all_parameters_df_1,hybrid_name==hybrids_weird[i])
+#  
+# plot_model_1=ggplot(data, aes(x = plant_density, y = predicted_yield, color=as.factor(yield_env))) +
+#   geom_line( aes(x=plant_density, y=predicted_yield,color=as.factor(yield_env)))+ggtitle(paste(hybrids[i],"- Density curve",sep=""))+facet_wrap(~hybrid_name)+geom_point(data=opt_data,aes(x=plant_density,y=predicted_yield,shape=density_type),size=3)+xlab("Planting Density (1K seeds/ha)")+ylab("SYLD Dry Yield (t/ha)")+labs(title = paste("Hybrid = ", hybrids_weird[i],"; ","Seasons = ",summary_data$number_of_seasons,"; ","locations = ",summary_data$number_of_locations,";","plots = ", summary_data$number_of_plots,"; ","points = ", summary_data$number_of_points,"; ","Adj R2 = ",round(data$adj_r_2[1],2),"; ","Confidence level = ",summary_data$confidence_level,sep=""))+ggsave(paste("/mnt/field_reports_2023/instinct/silage/not_normal_density_curves/",hybrids_weird[i], "_","INSTINCT_density_curve",".pdf",sep=""), width = 25, height = 20, units = "cm")
+# 
+# 
+# print(plot_model_1)
+#   
+# }
+
+
+
+
+flexibility_df = data.frame()
+ 
+ 
+for(i in 1:length(hybrids)){
+  g=hybrids[i]
+  #print(g)
+  dati <- dplyr::filter(lm_test_data_2, hybrid_name == g)
+  ye_levels = unique(dati$yield_env)
+  yield_levels_df = data.frame()
+  for(j in 1:length(ye_levels)){
+  h=ye_levels[j]
+  dati_1 <- dplyr::filter(dati, yield_env == h)
+  mi <- nls(predicted_yield ~ plant_density / (a + b * plant_density), data=dati_1, start=list(a=10,b=1),nls.control(maxiter = 500, tol = 1e-05, minFactor = 1/1024,
+            printEval = FALSE, warnOnly = FALSE))
+  #print(summary(mi))
+  out <- mi$m$getPars()
+  out$hybrid_name = g
+  out$ye_level = h
+  out=as.data.frame(out)
+  pred <- predict(mi)
+  n <- length(pred)
+  res <- resid(mi)
+  w <- weights(mi)
+  if (is.null(w)) w <- rep(1, n)
+  rss <- sum(w * res ^ 2)
+  resp <- pred + res
+  center <- weighted.mean(resp, w)
+  r.df <- summary(mi)$df[2]
+  int.df <- 1
+  tss <- sum(w * (resp - center)^2)
+  r.sq <- 1 - rss/tss
+  adj.r.sq <- 1 - (1 - r.sq) * (n - int.df) / r.df
+  out$pseudo.R.squared=r.sq
+  out$adj.r.sq=adj.r.sq
+  yield_levels_df  = rbind(yield_levels_df ,out)
+  }
+  flexibility_df  = rbind(flexibility_df ,yield_levels_df)
+}
+ 
+flexibility_df  = mutate(flexibility_df , flexibility = a/b)#, normalized_flexibility= flexibility/model_results$flexibility, rounded_norm_flex= round(normalized_flexibility,0))
+ 
+flexibility_df = flexibility_df %>% mutate(flexibility_class = ifelse(flexibility<=(-10),"1:Strong flex",ifelse(flexibility>-10 & flexibility<=(0),"2:More flex",ifelse(flexibility>0 & flexibility<=10 ,"3:Average",ifelse(flexibility>10 & flexibility<=20 ,"4:More fix",ifelse(flexibility>20,"5:Strong fix","NA"))))))
+
+
+#instinct_data_model_parameters_grain_ssc = instinct_data_model_parameters_grain_ssc %>% mutate(confidence_level_density = ifelse(pvalue_density_coeff <0.05 & pvalue_density_sqr_coeff <0.05, "High",ifelse(pvalue_density_coeff %in% c(0.01:0.05) & pvalue_density_sqr_coeff %in% c(0.01:0.05),"Medium","Low")))
+
+flexibility_df = flexibility_df %>% mutate(rsquared_greater_0.6=ifelse(adj.r.sq>0.6,"TRUE","FALSE"))
+flexibility_df = flexibility_df %>% mutate(rsquared_greater_0.3=ifelse(adj.r.sq>0.3,"TRUE","FALSE"))
+
+
+flexibility_df = flexibility_df %>% mutate(confidence_level_flexibility = ifelse(rsquared_greater_0.6 == "TRUE" , "High",ifelse(rsquared_greater_0.6 == "FALSE" & rsquared_greater_0.3 == "TRUE", "Medium", "Low")))
+
+
+
+
+lm_test_data_2_syld= lm_test_data_2
+flexibility_df_syld= flexibility_df
+opt_data_syld= optimal_density_1
+all_parameters_df_1_normal_syld= all_parameters_df_1_normal
+
+
+flexibility_df_syld$trait = "silage_dry_yield"
+opt_data_syld$trait = "silage_dry_yield"
+all_parameters_df_1_normal_syld$trait = "silage_dry_yield"
+```
+
+# SYLDFR x Density
+
+
+```{r message=FALSE, warning=FALSE, echo=F}
+#sub=points_data_pmt2_with_ye_for_instinct %>% filter(hybrid_name == "EV4145") 
+
+
+
+#France focus
+#points_data_pmt2_with_ye_for_instinct = filter(points_data_pmt2_with_ye_for_instinct, country %in% c("france"))
+
+points_data_pmt2_with_ye_for_instinct_summary = points_data %>% group_by(hybrid_name) %>% summarise(number_of_seasons=length(unique(Year)),number_of_locations=length(unique(Trial)),locations = paste(unique(Trial), collapse="; "),countries = paste(unique(Country), collapse="; "),number_of_plots=length(unique(plot_id)),number_of_points=length(unique(harvest_point)))
+
+points_data_pmt2_with_ye_for_instinct = points_data
+
+points_data_pmt2_with_ye_for_instinct$plant_density = points_data_pmt2_with_ye_for_instinct$target_density/1000
+
+points_data_pmt2_with_ye_for_instinct_summary_2 = filter(points_data_pmt2_with_ye_for_instinct_summary, number_of_locations>1)
+
+hybrids = unique(points_data_pmt2_with_ye_for_instinct_summary_2$hybrid_name)
+points_data_pmt2_with_ye_for_instinct$SYLDFR_TN_HA = as.double(as.character(points_data_pmt2_with_ye_for_instinct$SYLDFR_TN_HA))
+
+all_parameters_df=data.frame()
+for (i in 1:length(hybrids)){
+print(hybrids[i])
+early_silage_2_1 = filter(points_data_pmt2_with_ye_for_instinct, hybrid_name==hybrids[i])
+ 
+#names(early_silage_2_1)[17]="plant_density"
+ 
+#number_of_seasons = length(unique(early_silage_2_1$FIELD_year))
+number_of_locations = length(unique(early_silage_2_1$field))
+#number_of_plots = length(unique(early_silage_2_1$unique_plot_id))
+ 
+model_lm = lm(SYLDFR_TN_HA~plant_density+ I(plant_density^2)+ I(yield_env)+ I(yield_env*plant_density),data=early_silage_2_1)
+ 
+print(summary(model_lm))
+#mean_field_yield_method_4
+ 
+parameters_reg = as.data.frame(t(summary(model_lm)$coefficients))
+#lm_parameters = as.data.frame(t(summary(model_lm)$coefficients))
+  a = parameters_reg$`(Intercept)`[1]
+  b = parameters_reg$plant_density[1]
+  c = parameters_reg$`I(plant_density^2)`[1]
+  d = parameters_reg$`I(yield_env)`[1]
+ e = parameters_reg$`I(yield_env * plant_density)`[1]
+   pval_b = parameters_reg$plant_density[4]
+  pval_c = parameters_reg$`I(plant_density^2)`[4]
+  pval_d = parameters_reg$`I(yield_env)`[4]
+  pval_e = parameters_reg$`I(yield_env * plant_density)`[4]
+#print(summary(model_lm))
+print(summary(model_lm)$adj.r.squared)
+ 
+parameters_df = data.frame(hybrid_name=hybrids[i],intercept=a, coeff_density=b, coeff_density_sqr=c,coeff_ye=d,coeff_ye_density=e,pvalue_density_coeff=pval_b,pvalue_density_sqr_coeff=pval_c,r_2=summary(model_lm)$r.squared,adj_r_2=summary(model_lm)$adj.r.squared, pvalue_ye=pval_d,pvalue_ye_density=pval_e)
+ 
+early_silage_2_1$predicted_df <- predict(model_lm, early_silage_2_1)
+ 
+#early_silage_2_1_1 = filter(early_silage_2_1, mean_field_yield == min(early_silage_2_1$mean_field_yield) | mean_field_yield == max(early_silage_2_1$mean_field_yield) | mean_field_yield == median(early_silage_2_1$mean_field_yield) )
+ 
+# this is the predicted line of multiple linear regression
+ 
+# model_df = model_df %>% mutate(optimal_density = -coeff_density/(2*coeff_density_sqr),
+#     yld_max = intercept + coeff_density*optimal_density + coeff_density_sqr*optimal_density^2,economic_density = (-1)*(coeff_density-0.023)/(2*coeff_density_sqr),yld_eco = intercept + coeff_density*economic_density + coeff_density_sqr*economic_density^2)
+all_parameters_df = rbind(all_parameters_df,parameters_df)
+}
+
+points_data_pmt2_with_ye_for_instinct_summary_ye = points_data_pmt2_with_ye_for_instinct %>% group_by(hybrid_name) %>% summarise(min_ye = min(yield_env),max_ye=max(yield_env),round_min_ye=round(min_ye,0), round_max_ye=round(max_ye,0))
+
+
+#early_silage_2_1_summary = instinct_data_aman %>% group_by(hybrid) %>% summarise(low_ye=12,low_mid_ye=6,mid_ye=8,mid_high_ye=10,high_ye=14)
+
+#early_silage_2_1_summary = instinct_data_aman %>% group_by(hybrid) %>% summarise(low_ye=12,high_ye=14)
+
+
+#names(early_silage_2_1_summary)[1] = "hybrid_name"
+ 
+
+
+hyd.len = length(hybrids)
+final.bin1.table = NULL
+for(i in sequence(hyd.len)){
+  #temp = data.hy.sub %>% filter(Hybrid==hybrids[i])
+  temp = points_data_pmt2_with_ye_for_instinct_summary_ye %>% filter(hybrid_name==hybrids[i])
+  YE = seq(temp$round_min_ye,temp$round_max_ye,1)
+  #### Made the following change to keep the yield range same as Joo Yoon 3T/Ha to 20T/Ha, commented the previous line
+  #YE = seq(3,20,1)
+  bin1_table = temp
+  for(j in 1:(length(YE)-1)){
+    bin1_table = rbind(bin1_table,temp)
+  }
+  bin1_table$YE = YE
+  final.bin1.table = rbind(final.bin1.table,bin1_table)
+}
+
+lm_test_data = final.bin1.table[,c(1,6)]
+
+lm_test_data_1= lm_test_data%>% crossing(plant_density = seq(70,180,1))
+
+names(lm_test_data_1)[2] = "yield_env"
+#lm_test_data_long = lm_test_data %>% gather(ye_level,mean_field_yield, 2:3)
+
+lm_test_data_1 = inner_join(lm_test_data_1,all_parameters_df)
+ 
+#lm_test_data_long$predicted_yield=predict(model_lm,lm_test_data_long)
+ 
+lm_test_data_1 = lm_test_data_1 %>% mutate(predicted_yield=intercept+coeff_density*plant_density+coeff_density_sqr*plant_density*plant_density+coeff_ye*yield_env+coeff_ye_density*yield_env*plant_density)
+ 
+#domino.science-at-scale.io/u/adatt/EMEA_Corn_Grain_Density_Modelling/view/EMEA_2018-2019_corn_grain_MDmodel.R
+ 
+ 
+lm_test_data_2 = lm_test_data_1 %>% mutate(optimal_density = -(coeff_density+yield_env*coeff_ye_density)/(2*coeff_density_sqr),
+    yld_max = intercept + coeff_density*optimal_density + coeff_density_sqr*optimal_density^2+coeff_ye*yield_env+coeff_ye_density*yield_env*optimal_density,economic_density = (-1)*(coeff_density-0.023+yield_env*coeff_ye_density)/(2*coeff_density_sqr),yld_eco = intercept + coeff_density*economic_density + coeff_density_sqr*economic_density^2+coeff_ye*yield_env+coeff_ye_density*yield_env*economic_density)
+
+#domino.science-at-scale.io/u/jdmuno/PopCornDKC/view/app.R
+getOpt <- function(df, CP, SC){
+  # CP - commodity price
+  # SC - seed cost
+  df$AgOpt = - (df$b_pop + (df$e_ye_pop * df$YE)) / (2*df$c_pop_sq)
+  df$Yld_AgOpt = df$a_intcpt + df$AgOpt * df$b_pop + df$AgOpt**2 *df$c_pop_sq + df$YE * df$d_ye + df$YE * df$AgOpt * df$e_ye_pop
+  df$EcOpt = (SC * 1/80000 * 1000 - df$e_ye_pop*df$YE*CP - df$b_pop*CP) / (2* df$c_pop_sq*CP)
+  df$Yld_EcOpt = df$a_intcpt + df$EcOpt * df$b_pop + df$EcOpt**2 *df$c_pop_sq + df$YE * df$d_ye + df$YE * df$EcOpt * df$e_ye_pop
+  df$EcOpt[(df$EcOpt < df$min_pop * 0.9) | (df$EcOpt > df$max_pop * 1.1)] <- NA
+  df$Yld_EcOpt[is.na(df$EcOpt)] <- NA
+  return(df)
+}
+
+SC=6500
+CP=4000
+
+lm_test_data_2 = lm_test_data_2 %>% mutate(b_star = coeff_density+coeff_ye_density*yield_env,c_star=coeff_density_sqr,a_star = intercept+coeff_ye*yield_env,EcOpt = (SC * 1/80000 * 1000 - coeff_ye_density*yield_env*CP - coeff_density*CP) / (2* coeff_density_sqr*CP),
+  Yld_EcOpt = intercept + EcOpt * coeff_density + EcOpt**2 *coeff_density_sqr + yield_env * coeff_ye + yield_env * EcOpt * coeff_ye_density) 
+ 
+ 
+
+
+optimal_density = unique(lm_test_data_2[,c(1,2,16,17)])
+names(optimal_density)[3] = "plant_density"
+names(optimal_density)[4] = "predicted_yield"
+optimal_density$density_type="Optimal density"
+ 
+economic_density = unique(lm_test_data_2[,c(1,2,18,19)])
+names(economic_density)[3] = "plant_density"
+names(economic_density)[4] = "predicted_yield"
+economic_density$density_type="Slope constrained economic density"
+
+cost_economic_density = unique(lm_test_data_2[,c(1,2,23,24)])
+names(cost_economic_density)[3] = "plant_density"
+names(cost_economic_density)[4] = "predicted_yield"
+cost_economic_density$density_type="Seed cost constrained economic density"
+ 
+#cost_economic_density = unique(lm_test_data_long[,c(1,3,4,24,25)])
+#names(cost_economic_density)[4] = "plant_density"
+#names(cost_economic_density)[5] = "predicted_yield"
+#cost_economic_density$density_type="Seed cost constrained economic density"
+
+#lm_test_data_2$analysis_type = analysis_type
+ 
+optimal_density_1 = rbind(optimal_density,economic_density,cost_economic_density)
+
+#Post density curve QC
+optimal_density_2 = optimal_density_1 %>% filter(density_type=="Optimal density")
+
+optimal_density_2 = optimal_density_2 %>% group_by(hybrid_name) %>% mutate(rank_ye=rank(yield_env))
+
+optimal_density_3 = optimal_density_2 %>% group_by(hybrid_name) %>% mutate(min_ye_level=min(rank_ye), max_ye_level=max(rank_ye))
+
+optimal_density_3_min = optimal_density_3 %>% filter(rank_ye==min_ye_level)
+
+optimal_density_3_max = optimal_density_3 %>% filter(rank_ye==max_ye_level)
+
+optimal_density_3_all = rbind(optimal_density_3_min,optimal_density_3_max)
+
+optimal_density_3_all = optimal_density_3_all %>% mutate(opt_density_type = ifelse(rank_ye==1,"min_opt_density","max_opt_density")) %>% select(hybrid_name,opt_density_type,plant_density) 
+
+optimal_density_3_all = unique(optimal_density_3_all)
+
+optimal_density_3_all %>%
+    spread(opt_density_type, plant_density) %>%
+    mutate("Difference" = max_opt_density - min_opt_density) 
+
+optimal_density_3_all_1 = optimal_density_3_all%>% group_by(hybrid_name)%>% tidyr::spread(opt_density_type,plant_density) %>% mutate(difference=max_opt_density-min_opt_density, curve_quality=ifelse(difference>0,"normal","abnormal"))
+
+hybrids = filter(optimal_density_3_all_1,curve_quality=="normal")$hybrid_name
+
+all_parameters_df_1 = inner_join(all_parameters_df,points_data_pmt2_with_ye_for_instinct_summary)
+
+# defining confidence levels
+
+all_parameters_df_1 = all_parameters_df_1 %>% mutate(two_seasons_tested = ifelse(number_of_seasons>1, "TRUE", "FALSE"), atleast_ten_locations_tested= ifelse(number_of_locations>=10, "TRUE", "FALSE"),atleast_five_locations_tested= ifelse(number_of_locations>=5, "TRUE", "FALSE"),atleast_three_locations_tested= ifelse(number_of_locations>=3, "TRUE", "FALSE"))
+ 
+all_parameters_df_1 = all_parameters_df_1 %>% mutate(r2_atleast_0.8 = ifelse(adj_r_2>=0.8, "TRUE", "FALSE"), r2_atleast_0.6= ifelse(adj_r_2>=0.6, "TRUE", "FALSE"),r2_atleast_0.4= ifelse(adj_r_2>=0.4, "TRUE", "FALSE"),r2_atleast_0.2= ifelse(adj_r_2>=0.2, "TRUE", "FALSE"))
+
+confidence_unique_levels = unique(all_parameters_df_1[,c(18:25)])
+
+#defining confidence_level
+
+
+
+#write_csv(confidence_unique_levels,"/mnt/data/confidence_unique_levels.csv")
+
+#confidence_level_def = read_csv("/mnt/data/confidence__levels_definition_grain_dit.csv")
+
+#confidence_level_def = confidence_level_def %>% unite(flags_combined, two_seasons_tested,atleast_ten_locations_tested,atleast_five_locations_tested,atleast_three_locations_tested,r2_atleast_0.8,r2_atleast_0.6,r2_atleast_0.4,r2_atleast_0.2, sep="__",remove=F)
+#confidence_level_def_1 = confidence_level_def[,c(1,10)]
+ 
+#defining confidence levels for hybrids tested for 2 seasons
+
+#two_seasons_tested	atleast_ten_locations_tested	atleast_five_locations_tested	atleast_three_locations_tested	r2_atleast_0.8	r2_atleast_0.6	r2_atleast_0.4	r2_atleast_0.2
+#TRUE	TRUE	TRUE	TRUE	TRUE	TRUE	TRUE	TRUE	Very high
+
+#all_parameters_df_1 = all_parameters_df_1 %>% unite(flags_combined, two_seasons_tested,atleast_ten_locations_tested,atleast_five_locations_tested,atleast_three_locations_tested,r2_atleast_0.8,r2_atleast_0.6,r2_atleast_0.4,r2_atleast_0.2, sep="__",remove=F)
+
+#all_parameters_df_1 = inner_join(all_parameters_df_1,confidence_level_def_1)
+
+all_parameters_df_1 = all_parameters_df_1 %>% mutate(confidence_level = ifelse(two_seasons_tested=="FALSE" & r2_atleast_0.6 == "TRUE","medium","low"))
+
+all_parameters_df_1_normal = filter(all_parameters_df_1, hybrid_name %in% hybrids)
+
+#all_parameters_df_1_normal = all_parameters_df_1
+
+lm_test_data_2_normal = filter(lm_test_data_2, hybrid_name %in% hybrids)
+
+# lm_test_data_2_normal = lm_test_data_2
+#data = filter(lm_test_data_2, hybrid_name=="DKC77-26BR")
+#opt_data = filter(optimal_density_1, hybrid_name=="DKC77-26BR")
+#summary_data = filter(all_parameters_df_1,hybrid_name=="DKC77-26BR")
+ 
+#
+
+hybrids = unique(lm_test_data_2_normal$hybrid_name)
+
+for(i in 1:length(hybrids)){
+  print(hybrids[i])
+  
+  data = filter(lm_test_data_2, hybrid_name==hybrids[i])
+opt_data = filter(optimal_density_1, hybrid_name==hybrids[i])
+summary_data = filter(all_parameters_df_1,hybrid_name==hybrids[i])
+ 
+plot_model_1=ggplot(data, aes(x = plant_density, y = predicted_yield, color=as.factor(yield_env))) +
+  geom_line( aes(x=plant_density, y=predicted_yield,color=as.factor(yield_env)))+ggtitle(paste(hybrids[i],"- Density curve",sep=""))+facet_wrap(~hybrid_name)+geom_point(data=opt_data,aes(x=plant_density,y=predicted_yield,shape=density_type),size=3)+xlab("Planting Density (1K seeds/ha)")+ylab("SYLDFR Yield (t/ha)")+labs(title = paste("Hybrid = ", hybrids[i],"; ","Seasons = ",summary_data$number_of_seasons,"; ","locations = ",summary_data$number_of_locations,";","plots = ", summary_data$number_of_plots,"; ","points = ", summary_data$number_of_points,"; ","Adj R2 = ",round(data$adj_r_2[1],2),"; ","Conf level = ",summary_data$confidence_level,sep=""))+ggsave(paste("/mnt/field_reports_2025/instinct_results/eme_silage/SYLDFR/density_curves/",hybrids[i], "_","INSTINCT_density_curve",".pdf",sep=""), width = 25, height = 20, units = "cm")
+
+
+print(plot_model_1)
+  
+}
+
+
+
+##not normal density curves
+hybrids_weird = filter(optimal_density_3_all_1,!curve_quality=="normal")$hybrid_name
+
+for(i in 1:length(hybrids_weird)){
+  print(hybrids_weird[i])
+  
+  data = filter(lm_test_data_2, hybrid_name==hybrids_weird[i])
+opt_data = filter(optimal_density_1, hybrid_name==hybrids_weird[i])
+summary_data = filter(all_parameters_df_1,hybrid_name==hybrids_weird[i])
+ 
+plot_model_1=ggplot(data, aes(x = plant_density, y = predicted_yield, color=as.factor(yield_env))) +
+  geom_line( aes(x=plant_density, y=predicted_yield,color=as.factor(yield_env)))+ggtitle(paste(hybrids[i],"- Density curve",sep=""))+facet_wrap(~hybrid_name)+geom_point(data=opt_data,aes(x=plant_density,y=predicted_yield,shape=density_type),size=3)+xlab("Planting Density (1K seeds/ha)")+ylab("SYLDFR Yield (t/ha)")+labs(title = paste("Hybrid = ", hybrids_weird[i],"; ","Seasons = ",summary_data$number_of_seasons,"; ","locations = ",summary_data$number_of_locations,";","plots = ", summary_data$number_of_plots,"; ","points = ", summary_data$number_of_points,"; ","Adj R2 = ",round(data$adj_r_2[1],2),"; ","Confidence level = ",summary_data$confidence_level,sep=""))+ggsave(paste("/mnt/field_reports_2025/instinct_results/eme_silage/SYLDFR/not_normal_density_curves/",hybrids_weird[i], "_","INSTINCT_density_curve",".pdf",sep=""), width = 25, height = 20, units = "cm")
+
+
+print(plot_model_1)
+  
+}
+
+
+
+
+
+flexibility_df = data.frame()
+ 
+ 
+for(i in 1:length(hybrids)){
+  g=hybrids[i]
+  #print(g)
+  dati <- dplyr::filter(lm_test_data_2, hybrid_name == g)
+  ye_levels = unique(dati$yield_env)
+  yield_levels_df = data.frame()
+  for(j in 1:length(ye_levels)){
+  h=ye_levels[j]
+  dati_1 <- dplyr::filter(dati, yield_env == h)
+  mi <- nls(predicted_yield ~ plant_density / (a + b * plant_density), data=dati_1, start=list(a=10,b=1),nls.control(maxiter = 500, tol = 1e-05, minFactor = 1/1024,
+            printEval = FALSE, warnOnly = FALSE))
+  #print(summary(mi))
+  out <- mi$m$getPars()
+  out$hybrid_name = g
+  out$ye_level = h
+  out=as.data.frame(out)
+  pred <- predict(mi)
+  n <- length(pred)
+  res <- resid(mi)
+  w <- weights(mi)
+  if (is.null(w)) w <- rep(1, n)
+  rss <- sum(w * res ^ 2)
+  resp <- pred + res
+  center <- weighted.mean(resp, w)
+  r.df <- summary(mi)$df[2]
+  int.df <- 1
+  tss <- sum(w * (resp - center)^2)
+  r.sq <- 1 - rss/tss
+  adj.r.sq <- 1 - (1 - r.sq) * (n - int.df) / r.df
+  out$pseudo.R.squared=r.sq
+  out$adj.r.sq=adj.r.sq
+  yield_levels_df  = rbind(yield_levels_df ,out)
+  }
+  flexibility_df  = rbind(flexibility_df ,yield_levels_df)
+}
+ 
+flexibility_df  = mutate(flexibility_df , flexibility = a/b)#, normalized_flexibility= flexibility/model_results$flexibility, rounded_norm_flex= round(normalized_flexibility,0))
+ 
+flexibility_df = flexibility_df %>% mutate(flexibility_class = ifelse(flexibility<=(-10),"1:Strong flex",ifelse(flexibility>-10 & flexibility<=(0),"2:More flex",ifelse(flexibility>0 & flexibility<=10 ,"3:Average",ifelse(flexibility>10 & flexibility<=20 ,"4:More fix",ifelse(flexibility>20,"5:Strong fix","NA"))))))
+
+
+#instinct_data_model_parameters_grain_ssc = instinct_data_model_parameters_grain_ssc %>% mutate(confidence_level_density = ifelse(pvalue_density_coeff <0.05 & pvalue_density_sqr_coeff <0.05, "High",ifelse(pvalue_density_coeff %in% c(0.01:0.05) & pvalue_density_sqr_coeff %in% c(0.01:0.05),"Medium","Low")))
+
+flexibility_df = flexibility_df %>% mutate(rsquared_greater_0.6=ifelse(adj.r.sq>0.6,"TRUE","FALSE"))
+flexibility_df = flexibility_df %>% mutate(rsquared_greater_0.3=ifelse(adj.r.sq>0.3,"TRUE","FALSE"))
+
+
+flexibility_df = flexibility_df %>% mutate(confidence_level_flexibility = ifelse(rsquared_greater_0.6 == "TRUE" , "High",ifelse(rsquared_greater_0.6 == "FALSE" & rsquared_greater_0.3 == "TRUE", "Medium", "Low")))
+
+
+
+
+#lm_test_data_2_ondrej= lm_test_data_2
+#flexibility_df_ondrej= flexibility_df
+#opt_data_ondrej= optimal_density_1
+
+lm_test_data_2_syldfr= lm_test_data_2
+flexibility_df_syldfr= flexibility_df
+opt_data_syldfr= optimal_density_1
+all_parameters_df_1_normal_syldfr= all_parameters_df_1_normal
+
+
+flexibility_df_syldfr$trait = "silage_fresh_yield"
+opt_data_syldfr$trait = "silage_fresh_yield"
+all_parameters_df_1_normal_syldfr$trait = "silage_fresh_yield"
+```
+
+
+
+
+
+
+# save the data
+
+```{r}
+source("/mnt/code/DIT_functions (1) (2).R")
+flexibility_df_syldfr$trait = "silage_fresh_yield"
+opt_data_syldfr$trait = "silage_fresh_yield"
+all_parameters_df_1_normal_syldfr$trait = "silage_fresh_yield"
+
+flexibility_df_all = rbind(flexibility_df_syld,flexibility_df_syldfr)
+opt_data_all = rbind(opt_data_syld,opt_data_syldfr)
+
+all_parameters_df_1_normal_all = rbind(all_parameters_df_1_normal_syld,all_parameters_df_1_normal_syldfr)
+
+
+#optimal_density_1 = filter(optimal_density_1, !hybrid_name %in% c("DKC6492","DKC3088","DKC3719"))
+
+
+flexibility_df_all$crop = "Corn-Silage"
+
+#ssc_hybrids = c("EW6015XKL1","EW6436XKL1","EW6846XKL1","EW6846XKLZ","EW6015XKLZ","EW6436XKLZ","EW6846XKL1","EX6658XKL1")
+
+flexibility_df_all = flexibility_df_all %>% mutate(hybrid_type = ifelse(hybrid_name %in% ssc_hybrids, "Smart corn", "Tall hybrid"))
+
+
+#points_data_pmt2_with_ye_for_instinct_summary$hybrid_type = "PS4 Conventional-tall"
+#flexibility_df_all$trait = "grain_yield"
+flexibility_df_all$trial_type = "Geo-spatial large plot DIT trials"
+flexibility_df_all$region = "EME"
+
+
+all_parameters_df_1_normal_all$crop = "Corn-Silage"
+
+#ssc_hybrids = c("EW6015XKL1","EW6436XKL1","EW6846XKL1","EW6846XKLZ","EW6015XKLZ","EW6436XKLZ","EW6846XKL1","EX6658XKL1")
+
+all_parameters_df_1_normal_all = all_parameters_df_1_normal_all %>% mutate(hybrid_type = ifelse(hybrid_name %in% ssc_hybrids, "Smart corn", "Tall hybrid"))
+
+
+#points_data_pmt2_with_ye_for_instinct_summary$hybrid_type = "PS4 Conventional-tall"
+#flexibility_df_all$trait = "grain_yield"
+all_parameters_df_1_normal_all$trial_type = "Geo-spatial large plot DIT trials"
+all_parameters_df_1_normal_all$region = "EME"
+
+
+
+opt_data_all$crop = "Corn-Silage"
+
+#ssc_hybrids = c("EW6015XKL1","EW6436XKL1","EW6846XKL1","EW6846XKLZ","EW6015XKLZ","EW6436XKLZ","EW6846XKL1","EX6658XKL1")
+
+opt_data_all = opt_data_all %>% mutate(hybrid_type = ifelse(hybrid_name %in% ssc_hybrids, "Smart corn", "Tall hybrid"))
+
+
+#points_data_pmt2_with_ye_for_instinct_summary$hybrid_type = "PS4 Conventional-tall"
+#flexibility_df_all$trait = "grain_yield"
+opt_data_all$trial_type = "Geo-spatial large plot DIT trials"
+opt_data_all$region = "EME"
+
+#write_csv(all_parameters_df_1_normal_all,"/mnt/field_reports_2023/instinct_version_2_density_curves/rsa_instinct_data_updated/rsa_comparison_instinct_density_curve_plotting_data.csv")
+write_csv(opt_data_all,"/mnt/field_reports_2025/instinct_results//eme_silage/result_files/eme_dit_silage_instinct_opt_density_values_data_7thJan2025.csv")
+write_csv(flexibility_df_all,"/mnt/field_reports_2025/instinct_results//eme_silage/result_files/eme_dit_silage_comparison_instinct_flexibility_7thJan2025.csv")
+
+
+write_csv(all_parameters_df_1_normal_all,"/mnt/field_reports_2025/instinct_results//eme_silage/result_files/eme_dit_silage_hybrids_model_parameters_7thJan2025.csv")
+```
+
+# Adding historical silage data
+
+# SYLD x Density
+
+```{r message=FALSE, warning=FALSE, echo=F}
+#sub=points_data_pmt2_with_ye_for_instinct %>% filter(hybrid_name == "EV4145") 
+#silage_22 = read_csv("/mnt/data/DIT_silage_data_instinct_2022.csv")
+points_data_2025= points_data
+#names(points_data_2025)[13] = "dry_yield_t_ha"
+points_data_2025$dry_yield_t_ha = as.double(points_data_2025$dry_yield_t_ha)
+load("/mnt/data/eme_silage_dit_instinct_dataset_2022_to_2024.RData")
+eme_silage=points_data 
+
+  eme_silage$SYLDFR_TN_HA = as.double(as.character(eme_silage$SYLDFR_TN_HA ))
+  #eme_silage = eme_silage %>% mutate(target_density = ifelse(is.na(Popultn),plant_density*1000,Popultn))
+  eme_silage$target_density = as.double(as.character(eme_silage$target_density ))
+  
+#names(eme_silage)[13] = "dry_yield_t_ha"
+#eme_silage$target_density= eme_silage$Target_density
+  #eme_silage = eme_silage %>% group_by(Trial) %>% mutate(yield_env_1=mean(dry_yield_t_ha,na.rm=T),yield_env=median(dry_yield_t_ha,na.rm=T))
+    
+
+#France focus
+#points_data_pmt2_with_ye_for_instinct = filter(points_data_pmt2_with_ye_for_instinct, country %in% c("france"))
+  #[1] "2022_DIT_SIT1_ML35" "2022_DIT_SIT2_DF35"
+#[3] "2022_DIT_SIT3_CM35" "2022_DIT_SIT5_PS35"
+  #silage_22$Year = 2022
+  #exclude_trial = c("2022_DIT_SIT1_ML35")
+exclude_trial = c("2022_DIT_SIT2_DF35")
+  #exclude_trial = c("2022_DIT_SIT5_PS35")
+eme_silage = filter(eme_silage,!Trial %in% exclude_trial)  
+#silage_22 = silage_22 %>% mutate(harvest_point=row_number())
+#silage_22$harvest_point = 
+
+  
+  #points_data$Year = 2023
+
+  points_data_2025$SYLDFR_TN_HA = as.double(as.character(points_data_2025$SYLDFR_TN_HA ))
+  eme_silage = bind_rows(eme_silage,points_data_2025)
+eme_silage$Country = as.character(eme_silage$Country )
+eme_silage = eme_silage %>% mutate(Country = ifelse(Country == "czechrepublic","czech republic",Country))
+
+eme_silage = eme_silage%>% mutate(final_hybrid_name =ifelse(hybrid_name %in% c("EY6660XKL1","EY6660XKLZ","DKC6651SC"),"DKC6651SC",ifelse(hybrid_name %in% c("EW6846XKL1","EW6846XKLZ","DKC7236SC"),"DKC7236SC",ifelse(hybrid_name %in%c("EW6436XKL1","EW6436XKLZ","DKC6836SC"),"DKC6836SC",ifelse(hybrid_name %in% c("EX6658XKLZ","EX6658XKL1","DKC6648SC"),"DKC6648SC",ifelse(hybrid_name %in% c("EU5919XKY1","EU5919XPY1"),"EU5919XPY1",hybrid_name))))))
+# 
+eme_silage = eme_silage%>% mutate(final_hybrid_name =ifelse(final_hybrid_name %in%c("EY5433","DKC5358"),"DKC5358",ifelse(final_hybrid_name %in%                                    c("EY6852","DKC6855"),"DKC6855",ifelse(final_hybrid_name %in%
+ c("EY5433","DKC5358"),"DKC5358",ifelse(final_hybrid_name %in%                                   
+c("EX3950","DKC3747"),"DKC3747",ifelse(final_hybrid_name %in% c("EX3830","DKC3844"),"DKC3844",ifelse(final_hybrid_name %in% c("EX3426","DKC3346"),"DKC3346",ifelse(final_hybrid_name %in% c("EV3322","DKC3327"),"DKC3327",ifelse(final_hybrid_name %in% c("EX3187","DKC3247"),"DKC3247",ifelse(final_hybrid_name %in% c("EW5322","DKC5432"),"DKC5432",ifelse(final_hybrid_name %in% c("EW4843","DKC4933"),"DKC4933",ifelse(final_hybrid_name %in% c("EW4673","DKC4533"),"DKC4533",ifelse(final_hybrid_name %in% c("EW4563","DKC4433"),"DKC4433",ifelse(final_hybrid_name %in% c("EW4251","DKC4231"),"DKC4231",ifelse(final_hybrid_name %in% c("EW4051","DKC4031"),"DKC4031",ifelse(final_hybrid_name %in% c("EW3947","DKC3937"),"DKC3937",ifelse(final_hybrid_name %in% c("EV4736","DKC4726"),"DKC4726",ifelse(final_hybrid_name %in% c("EV4559","DKC4728"),"DKC4728",ifelse(final_hybrid_name %in% c("EV4248","DKC4228"),"DKC4228",ifelse(final_hybrid_name %in% c("EV4044","DKC3924"),"DKC3924",ifelse(final_hybrid_name %in% c("EV3322","DKC3327"),"DKC3327",ifelse(final_hybrid_name %in% c("EU5836","DKC5810"),"DKC5810",ifelse(final_hybrid_name %in% c("EU5146","DKC5016"),"DKC5016",ifelse(final_hybrid_name %in% c("EU4732","DKC4712"),"DKC4712",ifelse(final_hybrid_name %in% c("EU4661","DKC4611"),"DKC4611",ifelse(final_hybrid_name %in% c("EU3510","DKC3719"),"DKC3719",ifelse(final_hybrid_name %in% c("ET5314","DKC5404"),"DKC5404",ifelse(final_hybrid_name %in% c("ET5143","DKC5206"),"DKC5206",ifelse(final_hybrid_name %in% c("ET3821","DKC3805"),"DKC3805",ifelse(final_hybrid_name %in% c("ET3490","DKC3400"),"DKC3400",ifelse(final_hybrid_name %in% c("ES4920","DKC5092"),"DKC5092",ifelse(final_hybrid_name %in% c("ES4827","DKC4897"),"DKC4897",ifelse(final_hybrid_name %in% c("ES3649","DKC3609"),"DKC3609",ifelse(final_hybrid_name %in% c("ES3595","DKC3595"),"DKC3595",ifelse(final_hybrid_name %in% c("EV3950","DKC3527"),"DKC3527",ifelse(final_hybrid_name %in% c("EW6654","DKC6626"),"DKC6626",ifelse(final_hybrid_name %in% c("EX5932","DKC6044"),"DKC6044",ifelse(final_hybrid_name %in% c("EX5157","DKC5248"),"DKC5248",ifelse(final_hybrid_name %in% c("EX6017","DKC6147"),"DKC6147",ifelse(final_hybrid_name %in% c("EX6437","DKC6449"),"DKC6449",ifelse(final_hybrid_name %in% c("EX6849","DKC6845"),"DKC6845",ifelse(final_hybrid_name %in% c("EU5149","DKC5110"),"DKC5110",ifelse(final_hybrid_name %in% c("EY5259","DKC5159"),"DKC5159",ifelse(final_hybrid_name %in% c("EX4856","DKC5049"),"DKC5049",ifelse(final_hybrid_name %in% c("EW5322","DKC5432"),"DKC5432",ifelse(final_hybrid_name %in% c("EW6654","DKC6626"),"DKC6626",final_hybrid_name))))))))))))))))))))))))))))))))))))))))))))))                                                                                                                                                                            
+#                                                                                                                                                                                                                                                                                                                                                                                          
+# 
+eme_silage = eme_silage%>% mutate(final_hybrid_name = ifelse(final_hybrid_name %in%
+ c("EY6852","DKC6855"),"DKC6855",ifelse(final_hybrid_name %in% 
+ c("EY5641","DKC5653"),"DKC5653",ifelse(final_hybrid_name %in% 
+ c("EX6848","DKC7048"),"DKC7048",ifelse(final_hybrid_name %in% 
+ c("EX4935","DKC5148"),"DKC5148",ifelse(final_hybrid_name %in% 
+ c("EX4570","DKC4540"),"DKC4540",ifelse(final_hybrid_name %in% 
+ c("EW6934","DKC7034"),"DKC7034",ifelse(final_hybrid_name %in%
+ c("EW6755","DKC6731"),"DKC6731",ifelse(final_hybrid_name %in% 
+ c("EW6016","DKC6131"),"DKC6131",ifelse(final_hybrid_name %in% 
+ c("EW4836","DKC4655"),"DKC4655",ifelse(final_hybrid_name %in% 
+ c("EW4330","DKC4238"),"DKC4238",ifelse(final_hybrid_name %in% 
+ c("EV4450","DKC4320"),"DKC4320",ifelse(final_hybrid_name %in% 
+ c("EV4145","DKC4125"),"DKC4125",ifelse(final_hybrid_name %in% 
+ c("EV3511","DKC3527"),"DKC3527",ifelse(final_hybrid_name %in% 
+ c("EV3077","DKC3027"),"DKC3027",ifelse(final_hybrid_name %in% 
+ c("EU6222XPY1","DKC6212YG"),"DKC6212YG",ifelse(final_hybrid_name %in%
+ c("ET6641XKY1","DKC6503"),"DKC6503",ifelse(final_hybrid_name %in%
+ c("EY5433","DKC5358"),"DKC5358",final_hybrid_name))))))))))))))))))
+# 
+# 
+# #based on corn masterfile
+eme_silage = eme_silage%>% mutate(final_hybrid_name = ifelse(hybrid_name %in%
+c("EU6929","DKC6919"),"DKC6919",ifelse(hybrid_name %in%  c("EX5932","DKC6044"),"DKC6044",ifelse(hybrid_name %in% 
+ c("EY5933","DKC5951"),"DKC5951",ifelse(hybrid_name %in% 
+ c("EU5836","DKC5810"),"DKC5810",ifelse(hybrid_name %in% 
+ c("ER5725","DKC5685"),"DKC5685",ifelse(hybrid_name %in% 
+ c("EY5641","DKC5653"),"DKC5653",ifelse(hybrid_name %in%
+ c("EY5433","DKC5358"),"DKC5358",ifelse(hybrid_name %in% 
+ c("EX5431","DKC5342"),"DKC5342",ifelse(hybrid_name %in% 
+ c("ET5143","DKC5206"),"DKC5206",ifelse(hybrid_name %in% 
+ c("EY5259","DKC5159"),"DKC5159",ifelse(hybrid_name %in% 
+ c("EX4935","DKC5148"),"DKC5148",ifelse(hybrid_name %in% 
+ c("EU5149","DKC5110"),"DKC5110",ifelse(hybrid_name %in% 
+ c("ES4920","DKC5092"),"DKC5092",ifelse(hybrid_name %in% 
+ c("EP5026","DKC5068"),"DKC5068",ifelse(hybrid_name %in% 
+ c("EX4856","DKC5049"),"DKC5049",ifelse(hybrid_name %in%
+ c("EW4843","DKC4933"),"DKC4933",ifelse(hybrid_name %in%
+ c("ES4827","DKC4897"),"DKC4897",final_hybrid_name))))))))))))))))))
+# 
+# 
+eme_silage = eme_silage%>% mutate(final_hybrid_name = ifelse(hybrid_name %in%
+c("EX4744","DKC4741"),"DKC4741",ifelse(hybrid_name %in%  c("EU4732","DKC4712"),"DKC4712",ifelse(hybrid_name %in% 
+c("EW4836","DKC4655"),"DKC4655",ifelse(hybrid_name %in% 
+c("EX4570","DKC4540"),"DKC4540",ifelse(hybrid_name %in% 
+c("EW4673","DKC4533"),"DKC4533",ifelse(hybrid_name %in% 
+c("EW4563","DKC4433"),"DKC4433",ifelse(hybrid_name %in%
+c("ES4241","DKC4391"),"DKC4391",ifelse(hybrid_name %in% 
+c("EW4252","DKC4335"),"DKC4335",ifelse(hybrid_name %in% 
+c("EY4260","DKC4253"),"DKC4253",ifelse(hybrid_name %in% 
+c("EW4251","DKC4231"),"DKC4231",ifelse(hybrid_name %in% 
+c("EV4145","DKC4125"),"DKC4125",ifelse(hybrid_name %in% 
+c("EW4051","DKC4031"),"DKC4031",ifelse(hybrid_name %in%  c("EQ3923","DKC3972"),"DKC3972",ifelse(hybrid_name %in% 
+c("EW3947","DKC3937"),"DKC3937",ifelse(hybrid_name %in% 
+c("EX3830","DKC3844"),"DKC3844",ifelse(hybrid_name %in%
+c("EX3950","DKC3747"),"DKC3747",ifelse(hybrid_name %in%
+ c("EX3426","DKC3346"),"DKC3346",final_hybrid_name))))))))))))))))))
+# 
+# 
+ eme_silage = eme_silage%>% mutate(final_hybrid_name = ifelse(hybrid_name %in%
+ c("EX3187","DKC3247"),"DKC3247",ifelse(hybrid_name %in% 
+ c("EY3205","DKC3152"),"DKC3152",ifelse(hybrid_name %in% 
+ c("EX3189","DKC3149"),"DKC3149",ifelse(hybrid_name %in% 
+ c("EX4570","DKC4540"),"DKC4540",ifelse(hybrid_name %in% 
+ c("EW4673","DKC4533"),"DKC4533",ifelse(hybrid_name %in% 
+ c("EW4563","DKC4433"),"DKC4433",ifelse(hybrid_name %in%
+ c("ES4241","DKC4391"),"DKC4391",ifelse(hybrid_name %in% 
+ c("EW4252","DKC4335"),"DKC4335",ifelse(hybrid_name %in% 
+ c("EY4260","DKC4253"),"DKC4253",ifelse(hybrid_name %in% 
+ c("EW4251","DKC4231"),"DKC4231",ifelse(hybrid_name %in% 
+ c("EV4145","DKC4125"),"DKC4125",ifelse(hybrid_name %in% 
+ c("EW4051","DKC4031"),"DKC4031",ifelse(hybrid_name %in% 
+ c("EQ3923","DKC3972"),"DKC3972",ifelse(hybrid_name %in% 
+ c("EW3947","DKC3937"),"DKC3937",ifelse(hybrid_name %in% 
+ c("EX3830","DKC3844"),"DKC3844",ifelse(hybrid_name %in%
+ c("EX3950","DKC3747"),"DKC3747",ifelse(hybrid_name %in%
+ c("EX3426","DKC3346"),"DKC3346",final_hybrid_name))))))))))))))))))
+
+eme_silage$hybrid_name = eme_silage$final_hybrid_name
+eme_silage$final_hybrid_name = NULL
+
+eme_silage = eme_silage %>% mutate(Country = ifelse(Country %in% c("Italy","italy"),"italy",ifelse(Country %in% c( "czechia","czech","Czech"),"czech",Country)))
+points_data_pmt2_with_ye_for_instinct_summary = eme_silage %>% group_by(hybrid_name) %>% summarise(number_of_seasons=length(unique(Year)),number_of_locations=length(unique(Trial)),locations = paste(unique(Trial), collapse="; "),countries = paste(unique(Country), collapse="; "),number_of_plots=length(unique(plot_id)),number_of_points=n())
+
+points_data_pmt2_with_ye_for_instinct = eme_silage
+
+points_data_pmt2_with_ye_for_instinct$plant_density = points_data_pmt2_with_ye_for_instinct$target_density/1000
+
+points_data_pmt2_with_ye_for_instinct$plant_density= as.double(points_data_pmt2_with_ye_for_instinct$plant_density)
+
+#points_data_pmt2_with_ye_for_instinct = filter(points_data_pmt2_with_ye_for_instinct,!is.na(plant_density))
+
+points_data_pmt2_with_ye_for_instinct_summary_2 = filter(points_data_pmt2_with_ye_for_instinct_summary, number_of_locations>1)
+
+#exclude_hybrids = c("DKC6492","DKC6752","DKC6812","EV6649","EW6015XKL1","EW6755","EW6756")
+
+#points_data_pmt2_with_ye_for_instinct_summary_2 = filter(points_data_pmt2_with_ye_for_instinct_summary_2, !hybrid_name %in% exclude_hybrids)
+
+hybrids = unique(points_data_pmt2_with_ye_for_instinct_summary_2$hybrid_name)
+
+DKC6492 = filter(points_data_pmt2_with_ye_for_instinct, hybrid_name=="DKC6492")
+all_parameters_df=data.frame()
+for (i in 1:length(hybrids)){
+print(hybrids[i])
+early_silage_2_1 = filter(points_data_pmt2_with_ye_for_instinct, hybrid_name==hybrids[i])
+ 
+#names(early_silage_2_1)[17]="plant_density"
+ 
+#number_of_seasons = length(unique(early_silage_2_1$FIELD_year))
+number_of_locations = length(unique(early_silage_2_1$field))
+#number_of_plots = length(unique(early_silage_2_1$unique_plot_id))
+ 
+model_lm = lm(dry_yield_t_ha~plant_density+ I(plant_density^2)+ I(yield_env)+ I(yield_env*plant_density),data=early_silage_2_1)
+ 
+print(summary(model_lm))
+#mean_field_yield_method_4
+ 
+parameters_reg = as.data.frame(t(summary(model_lm)$coefficients))
+#lm_parameters = as.data.frame(t(summary(model_lm)$coefficients))
+  a = parameters_reg$`(Intercept)`[1]
+  b = parameters_reg$plant_density[1]
+  c = parameters_reg$`I(plant_density^2)`[1]
+  d = parameters_reg$`I(yield_env)`[1]
+ e = parameters_reg$`I(yield_env * plant_density)`[1]
+   pval_b = parameters_reg$plant_density[4]
+  pval_c = parameters_reg$`I(plant_density^2)`[4]
+  pval_d = parameters_reg$`I(yield_env)`[4]
+  pval_e = parameters_reg$`I(yield_env * plant_density)`[4]
+#print(summary(model_lm))
+print(summary(model_lm)$adj.r.squared)
+ 
+parameters_df = data.frame(hybrid_name=hybrids[i],intercept=a, coeff_density=b, coeff_density_sqr=c,coeff_ye=d,coeff_ye_density=e,pvalue_density_coeff=pval_b,pvalue_density_sqr_coeff=pval_c,r_2=summary(model_lm)$r.squared,adj_r_2=summary(model_lm)$adj.r.squared, pvalue_ye=pval_d,pvalue_ye_density=pval_e)
+ 
+early_silage_2_1$predicted_df <- predict(model_lm, early_silage_2_1)
+ 
+#early_silage_2_1_1 = filter(early_silage_2_1, mean_field_yield == min(early_silage_2_1$mean_field_yield) | mean_field_yield == max(early_silage_2_1$mean_field_yield) | mean_field_yield == median(early_silage_2_1$mean_field_yield) )
+ 
+# this is the predicted line of multiple linear regression
+ 
+# model_df = model_df %>% mutate(optimal_density = -coeff_density/(2*coeff_density_sqr),
+#     yld_max = intercept + coeff_density*optimal_density + coeff_density_sqr*optimal_density^2,economic_density = (-1)*(coeff_density-0.023)/(2*coeff_density_sqr),yld_eco = intercept + coeff_density*economic_density + coeff_density_sqr*economic_density^2)
+all_parameters_df = rbind(all_parameters_df,parameters_df)
+}
+
+points_data_pmt2_with_ye_for_instinct_summary_ye = points_data_pmt2_with_ye_for_instinct %>% group_by(hybrid_name) %>% summarise(min_ye = min(yield_env),max_ye=max(yield_env),round_min_ye=round(min_ye,0), round_max_ye=round(max_ye,0))
+
+
+#early_silage_2_1_summary = instinct_data_aman %>% group_by(hybrid) %>% summarise(low_ye=12,low_mid_ye=6,mid_ye=8,mid_high_ye=10,high_ye=14)
+
+#early_silage_2_1_summary = instinct_data_aman %>% group_by(hybrid) %>% summarise(low_ye=12,high_ye=14)
+
+
+#names(early_silage_2_1_summary)[1] = "hybrid_name"
+ 
+
+
+hyd.len = length(hybrids)
+final.bin1.table = NULL
+for(i in sequence(hyd.len)){
+  #temp = data.hy.sub %>% filter(Hybrid==hybrids[i])
+  temp = points_data_pmt2_with_ye_for_instinct_summary_ye %>% filter(hybrid_name==hybrids[i])
+  YE = seq(temp$round_min_ye,temp$round_max_ye,1)
+  #### Made the following change to keep the yield range same as Joo Yoon 3T/Ha to 20T/Ha, commented the previous line
+  #YE = seq(3,20,1)
+  bin1_table = temp
+  for(j in 1:(length(YE)-1)){
+    bin1_table = rbind(bin1_table,temp)
+  }
+  bin1_table$YE = YE
+  final.bin1.table = rbind(final.bin1.table,bin1_table)
+}
+
+lm_test_data = final.bin1.table[,c(1,6)]
+
+lm_test_data_1= lm_test_data%>% crossing(plant_density = seq(70,180,1))
+
+names(lm_test_data_1)[2] = "yield_env"
+#lm_test_data_long = lm_test_data %>% gather(ye_level,mean_field_yield, 2:3)
+
+all_parameters_df = filter(all_parameters_df, coeff_density_sqr<0)
+
+lm_test_data_1 = inner_join(lm_test_data_1,all_parameters_df)
+ 
+#lm_test_data_long$predicted_yield=predict(model_lm,lm_test_data_long)
+ 
+lm_test_data_1 = lm_test_data_1 %>% mutate(predicted_yield=intercept+coeff_density*plant_density+coeff_density_sqr*plant_density*plant_density+coeff_ye*yield_env+coeff_ye_density*yield_env*plant_density)
+ 
+#domino.science-at-scale.io/u/adatt/EMEA_Corn_Grain_Density_Modelling/view/EMEA_2018-2019_corn_grain_MDmodel.R
+ 
+ 
+lm_test_data_2 = lm_test_data_1 %>% mutate(optimal_density = -(coeff_density+yield_env*coeff_ye_density)/(2*coeff_density_sqr),
+    yld_max = intercept + coeff_density*optimal_density + coeff_density_sqr*optimal_density^2+coeff_ye*yield_env+coeff_ye_density*yield_env*optimal_density,economic_density = (-1)*(coeff_density-0.023+yield_env*coeff_ye_density)/(2*coeff_density_sqr),yld_eco = intercept + coeff_density*economic_density + coeff_density_sqr*economic_density^2+coeff_ye*yield_env+coeff_ye_density*yield_env*economic_density)
+
+#domino.science-at-scale.io/u/jdmuno/PopCornDKC/view/app.R
+getOpt <- function(df, CP, SC){
+  # CP - commodity price
+  # SC - seed cost
+  df$AgOpt = - (df$b_pop + (df$e_ye_pop * df$YE)) / (2*df$c_pop_sq)
+  df$Yld_AgOpt = df$a_intcpt + df$AgOpt * df$b_pop + df$AgOpt**2 *df$c_pop_sq + df$YE * df$d_ye + df$YE * df$AgOpt * df$e_ye_pop
+  df$EcOpt = (SC * 1/80000 * 1000 - df$e_ye_pop*df$YE*CP - df$b_pop*CP) / (2* df$c_pop_sq*CP)
+  df$Yld_EcOpt = df$a_intcpt + df$EcOpt * df$b_pop + df$EcOpt**2 *df$c_pop_sq + df$YE * df$d_ye + df$YE * df$EcOpt * df$e_ye_pop
+  df$EcOpt[(df$EcOpt < df$min_pop * 0.9) | (df$EcOpt > df$max_pop * 1.1)] <- NA
+  df$Yld_EcOpt[is.na(df$EcOpt)] <- NA
+  return(df)
+}
+
+SC=6500
+CP=4000
+
+lm_test_data_2 = lm_test_data_2 %>% mutate(b_star = coeff_density+coeff_ye_density*yield_env,c_star=coeff_density_sqr,a_star = intercept+coeff_ye*yield_env,EcOpt = (SC * 1/80000 * 1000 - coeff_ye_density*yield_env*CP - coeff_density*CP) / (2* coeff_density_sqr*CP),
+  Yld_EcOpt = intercept + EcOpt * coeff_density + EcOpt**2 *coeff_density_sqr + yield_env * coeff_ye + yield_env * EcOpt * coeff_ye_density) 
+ 
+ 
+
+
+optimal_density = unique(lm_test_data_2[,c(1,2,16,17)])
+names(optimal_density)[3] = "plant_density"
+names(optimal_density)[4] = "predicted_yield"
+optimal_density$density_type="Optimal density"
+ 
+economic_density = unique(lm_test_data_2[,c(1,2,18,19)])
+names(economic_density)[3] = "plant_density"
+names(economic_density)[4] = "predicted_yield"
+economic_density$density_type="Slope constrained economic density"
+
+cost_economic_density = unique(lm_test_data_2[,c(1,2,23,24)])
+names(cost_economic_density)[3] = "plant_density"
+names(cost_economic_density)[4] = "predicted_yield"
+cost_economic_density$density_type="Seed cost constrained economic density"
+ 
+#cost_economic_density = unique(lm_test_data_long[,c(1,3,4,24,25)])
+#names(cost_economic_density)[4] = "plant_density"
+#names(cost_economic_density)[5] = "predicted_yield"
+#cost_economic_density$density_type="Seed cost constrained economic density"
+
+#lm_test_data_2$analysis_type = analysis_type
+ 
+optimal_density_1 = rbind(optimal_density,economic_density,cost_economic_density)
+
+#Post density curve QC
+optimal_density_2 = optimal_density_1 %>% filter(density_type=="Optimal density")
+
+optimal_density_2 = optimal_density_2 %>% group_by(hybrid_name) %>% mutate(rank_ye=rank(yield_env))
+
+optimal_density_3 = optimal_density_2 %>% group_by(hybrid_name) %>% mutate(min_ye_level=min(rank_ye), max_ye_level=max(rank_ye))
+
+optimal_density_3_min = optimal_density_3 %>% filter(rank_ye==min_ye_level)
+
+optimal_density_3_max = optimal_density_3 %>% filter(rank_ye==max_ye_level)
+
+optimal_density_3_all = rbind(optimal_density_3_min,optimal_density_3_max)
+
+optimal_density_3_all = optimal_density_3_all %>% mutate(opt_density_type = ifelse(rank_ye==1,"min_opt_density","max_opt_density")) %>% select(hybrid_name,opt_density_type,plant_density) 
+
+optimal_density_3_all = unique(optimal_density_3_all)
+
+optimal_density_3_all %>%
+    spread(opt_density_type, plant_density) %>%
+    mutate("Difference" = max_opt_density - min_opt_density) 
+
+optimal_density_3_all_1 = optimal_density_3_all%>% group_by(hybrid_name)%>% tidyr::spread(opt_density_type,plant_density) %>% mutate(difference=max_opt_density-min_opt_density, curve_quality=ifelse(difference>0,"normal","abnormal"))
+
+hybrids = filter(optimal_density_3_all_1,curve_quality=="normal")$hybrid_name
+
+all_parameters_df_1 = inner_join(all_parameters_df,points_data_pmt2_with_ye_for_instinct_summary)
+
+all_parameters_df_1 = filter(all_parameters_df_1, hybrid_name %in% hybrids)
+
+all_parameters_df_1 = filter(all_parameters_df_1, !hybrid_name %in% c("EZ7114XKL1"))
+
+hybrids_final = unique(all_parameters_df_1$hybrid_name)
+
+
+# defining confidence levels
+
+all_parameters_df_1 = all_parameters_df_1 %>% mutate(two_seasons_tested = ifelse(number_of_seasons>1, "TRUE", "FALSE"), atleast_ten_locations_tested= ifelse(number_of_locations>=10, "TRUE", "FALSE"),atleast_five_locations_tested= ifelse(number_of_locations>=5, "TRUE", "FALSE"),atleast_three_locations_tested= ifelse(number_of_locations>=3, "TRUE", "FALSE"))
+ 
+all_parameters_df_1 = all_parameters_df_1 %>% mutate(r2_atleast_0.8 = ifelse(adj_r_2>=0.8, "TRUE", "FALSE"), r2_atleast_0.6= ifelse(adj_r_2>=0.6, "TRUE", "FALSE"),r2_atleast_0.4= ifelse(adj_r_2>=0.4, "TRUE", "FALSE"),r2_atleast_0.2= ifelse(adj_r_2>=0.2, "TRUE", "FALSE"))
+
+confidence_unique_levels = unique(all_parameters_df_1[,c(19:26)])
+
+#defining confidence_level
+
+
+
+#write_csv(confidence_unique_levels,"/mnt/data/confidence_unique_levels.csv")
+
+#confidence_level_def = read_csv("/mnt/data/confidence__levels_definition_grain_dit.csv")
+
+#confidence_level_def = confidence_level_def %>% unite(flags_combined, two_seasons_tested,atleast_ten_locations_tested,atleast_five_locations_tested,atleast_three_locations_tested,r2_atleast_0.8,r2_atleast_0.6,r2_atleast_0.4,r2_atleast_0.2, sep="__",remove=F)
+#confidence_level_def_1 = confidence_level_def[,c(1,10)]
+ 
+#defining confidence levels for hybrids tested for 2 seasons
+
+#two_seasons_tested	atleast_ten_locations_tested	atleast_five_locations_tested	atleast_three_locations_tested	r2_atleast_0.8	r2_atleast_0.6	r2_atleast_0.4	r2_atleast_0.2
+#TRUE	TRUE	TRUE	TRUE	TRUE	TRUE	TRUE	TRUE	Very high
+
+#all_parameters_df_1 = all_parameters_df_1 %>% unite(flags_combined, two_seasons_tested,atleast_ten_locations_tested,atleast_five_locations_tested,atleast_three_locations_tested,r2_atleast_0.8,r2_atleast_0.6,r2_atleast_0.4,r2_atleast_0.2, sep="__",remove=F)
+
+#all_parameters_df_1 = inner_join(all_parameters_df_1,confidence_level_def_1)
+
+all_parameters_df_1 = all_parameters_df_1 %>% mutate(confidence_level = ifelse(two_seasons_tested=="FALSE" & r2_atleast_0.6 == "TRUE","medium","low"))
+
+all_parameters_df_1 = all_parameters_df_1 %>% mutate(confidence_level = ifelse(two_seasons_tested=="TRUE" ,"medium",confidence_level))
+
+all_parameters_df_1_normal = filter(all_parameters_df_1, hybrid_name %in% hybrids_final)
+
+#all_parameters_df_1_normal = all_parameters_df_1
+
+lm_test_data_2_normal = filter(lm_test_data_2, hybrid_name %in% hybrids_final)
+
+# lm_test_data_2_normal = lm_test_data_2
+#data = filter(lm_test_data_2, hybrid_name=="DKC77-26BR")
+#opt_data = filter(optimal_density_1, hybrid_name=="DKC77-26BR")
+#summary_data = filter(all_parameters_df_1,hybrid_name=="DKC77-26BR")
+ 
+#
+
+hybrids = unique(lm_test_data_2_normal$hybrid_name)
+
+for(i in 1:length(hybrids)){
+  print(hybrids[i])
+  
+  data = filter(lm_test_data_2, hybrid_name==hybrids[i])
+opt_data = filter(optimal_density_1, hybrid_name==hybrids[i])
+summary_data = filter(all_parameters_df_1,hybrid_name==hybrids[i])
+ 
+plot_model_1=ggplot(data, aes(x = plant_density, y = predicted_yield, color=as.factor(yield_env))) +
+  geom_line( aes(x=plant_density, y=predicted_yield,color=as.factor(yield_env)))+ggtitle(paste(hybrids[i],"- Density curve",sep=""))+facet_wrap(~hybrid_name)+geom_point(data=opt_data,aes(x=plant_density,y=predicted_yield,shape=density_type),size=3)+xlab("Planting Density (1K seeds/ha)")+ylab("SYLD Dry Yield (t/ha)")+labs(title = paste("Hybrid = ", hybrids[i],"; ","Seasons = ",summary_data$number_of_seasons,"; ","locations = ",summary_data$number_of_locations,";","plots = ", summary_data$number_of_plots,"; ","points = ", summary_data$number_of_points,"; ","Adj R2 = ",round(data$adj_r_2[1],2),"; ","Conf level = ",summary_data$confidence_level,sep=""))+ggsave(paste("/mnt/field_reports_2025/instinct_results/eme_silage/all_data/density_curves/",hybrids[i], "_","INSTINCT_density_curve",".pdf",sep=""), width = 25, height = 20, units = "cm")
+
+
+print(plot_model_1)
+  
+}
+
+
+
+##not normal density curves
+# hybrids_weird = filter(optimal_density_3_all_1,!curve_quality=="normal")$hybrid_name
+# 
+# for(i in 1:length(hybrids_weird)){
+#   print(hybrids_weird[i])
+#   
+#   data = filter(lm_test_data_2, hybrid_name==hybrids_weird[i])
+# opt_data = filter(optimal_density_1, hybrid_name==hybrids_weird[i])
+# summary_data = filter(all_parameters_df_1,hybrid_name==hybrids_weird[i])
+#  
+# plot_model_1=ggplot(data, aes(x = plant_density, y = predicted_yield, color=as.factor(yield_env))) +
+#   geom_line( aes(x=plant_density, y=predicted_yield,color=as.factor(yield_env)))+ggtitle(paste(hybrids[i],"- Density curve",sep=""))+facet_wrap(~hybrid_name)+geom_point(data=opt_data,aes(x=plant_density,y=predicted_yield,shape=density_type),size=3)+xlab("Planting Density (1K seeds/ha)")+ylab("SYLD Dry Yield (t/ha)")+labs(title = paste("Hybrid = ", hybrids_weird[i],"; ","Seasons = ",summary_data$number_of_seasons,"; ","locations = ",summary_data$number_of_locations,";","plots = ", summary_data$number_of_plots,"; ","points = ", summary_data$number_of_points,"; ","Adj R2 = ",round(data$adj_r_2[1],2),"; ","Confidence level = ",summary_data$confidence_level,sep=""))+ggsave(paste("/mnt/field_reports_2023/instinct/silage/not_normal_density_curves/",hybrids_weird[i], "_","INSTINCT_density_curve",".pdf",sep=""), width = 25, height = 20, units = "cm")
+# 
+# 
+# print(plot_model_1)
+#   
+# }
+
+exclude_hybrid = c("DKC7236SC")
+
+lm_test_data_2 = filter(lm_test_data_2,!hybrid_name %in% exclude_hybrid )
+
+hybrids = unique(lm_test_data_2$hybrid_name)
+flexibility_df = data.frame()
+ 
+ 
+for(i in 1:length(hybrids)){
+  g=hybrids[i]
+  print(g)
+  dati <- dplyr::filter(lm_test_data_2, hybrid_name == g)
+  ye_levels = unique(dati$yield_env)
+  yield_levels_df = data.frame()
+  for(j in 1:length(ye_levels)){
+  h=ye_levels[j]
+  dati_1 <- dplyr::filter(dati, yield_env == h)
+  mi <- nls(predicted_yield ~ plant_density / (a + b * plant_density), data=dati_1, start=list(a=10,b=1),nls.control(maxiter = 2500, tol = 1e-05, minFactor = 1/3000,
+            printEval = FALSE, warnOnly = FALSE))
+  #print(summary(mi))
+  out <- mi$m$getPars()
+  out$hybrid_name = g
+  out$ye_level = h
+  out=as.data.frame(out)
+  pred <- predict(mi)
+  n <- length(pred)
+  res <- resid(mi)
+  w <- weights(mi)
+  if (is.null(w)) w <- rep(1, n)
+  rss <- sum(w * res ^ 2)
+  resp <- pred + res
+  center <- weighted.mean(resp, w)
+  r.df <- summary(mi)$df[2]
+  int.df <- 1
+  tss <- sum(w * (resp - center)^2)
+  r.sq <- 1 - rss/tss
+  adj.r.sq <- 1 - (1 - r.sq) * (n - int.df) / r.df
+  out$pseudo.R.squared=r.sq
+  out$adj.r.sq=adj.r.sq
+  yield_levels_df  = rbind(yield_levels_df ,out)
+  }
+  flexibility_df  = rbind(flexibility_df ,yield_levels_df)
+}
+ 
+flexibility_df  = mutate(flexibility_df , flexibility = a/b)#, normalized_flexibility= flexibility/model_results$flexibility, rounded_norm_flex= round(normalized_flexibility,0))
+ 
+flexibility_df = flexibility_df %>% mutate(flexibility_class = ifelse(flexibility<=(-10),"1:Strong flex",ifelse(flexibility>-10 & flexibility<=(0),"2:More flex",ifelse(flexibility>0 & flexibility<=10 ,"3:Average",ifelse(flexibility>10 & flexibility<=20 ,"4:More fix",ifelse(flexibility>20,"5:Strong fix","NA"))))))
+
+
+#instinct_data_model_parameters_grain_ssc = instinct_data_model_parameters_grain_ssc %>% mutate(confidence_level_density = ifelse(pvalue_density_coeff <0.05 & pvalue_density_sqr_coeff <0.05, "High",ifelse(pvalue_density_coeff %in% c(0.01:0.05) & pvalue_density_sqr_coeff %in% c(0.01:0.05),"Medium","Low")))
+
+flexibility_df = flexibility_df %>% mutate(rsquared_greater_0.6=ifelse(adj.r.sq>0.6,"TRUE","FALSE"))
+flexibility_df = flexibility_df %>% mutate(rsquared_greater_0.3=ifelse(adj.r.sq>0.3,"TRUE","FALSE"))
+
+
+flexibility_df = flexibility_df %>% mutate(confidence_level_flexibility = ifelse(rsquared_greater_0.6 == "TRUE" , "High",ifelse(rsquared_greater_0.6 == "FALSE" & rsquared_greater_0.3 == "TRUE", "Medium", "Low")))
+
+
+
+
+lm_test_data_2_syld= lm_test_data_2
+flexibility_df_syld= flexibility_df
+opt_data_syld= optimal_density_1
+all_parameters_df_1_normal_syld= all_parameters_df_1_normal
+
+
+flexibility_df_syld$trait = "silage_dry_yield"
+opt_data_syld$trait = "silage_dry_yield"
+all_parameters_df_1_normal_syld$trait = "silage_dry_yield"
+```
+
+
+# SYLDFR x Density -22 and 23
+
+
+```{r message=FALSE, warning=FALSE, echo=F}
+#sub=points_data_pmt2_with_ye_for_instinct %>% filter(hybrid_name == "EV4145") 
+
+hybrids_final = unique(all_parameters_df_1$hybrid_name)
+eme_silage = filter(eme_silage, hybrid_name %in% hybrids_final)
+
+#France focus
+#points_data_pmt2_with_ye_for_instinct = filter(points_data_pmt2_with_ye_for_instinct, country %in% c("france"))
+
+points_data_pmt2_with_ye_for_instinct_summary = eme_silage %>% group_by(hybrid_name) %>% summarise(number_of_seasons=length(unique(Year)),number_of_locations=length(unique(Trial)),locations = paste(unique(Trial), collapse="; "),countries = paste(unique(Country), collapse="; "),number_of_plots=length(unique(plot_id)),number_of_points=n())
+
+points_data_pmt2_with_ye_for_instinct = eme_silage
+
+points_data_pmt2_with_ye_for_instinct$plant_density = points_data_pmt2_with_ye_for_instinct$target_density/1000
+
+points_data_pmt2_with_ye_for_instinct_summary_2 = filter(points_data_pmt2_with_ye_for_instinct_summary, number_of_locations>1)
+
+hybrids = unique(points_data_pmt2_with_ye_for_instinct_summary_2$hybrid_name)
+points_data_pmt2_with_ye_for_instinct$SYLDFR_TN_HA = as.double(as.character(points_data_pmt2_with_ye_for_instinct$SYLDFR_TN_HA))
+
+all_parameters_df=data.frame()
+for (i in 1:length(hybrids)){
+print(hybrids[i])
+early_silage_2_1 = filter(points_data_pmt2_with_ye_for_instinct, hybrid_name==hybrids[i])
+ 
+#names(early_silage_2_1)[17]="plant_density"
+ 
+#number_of_seasons = length(unique(early_silage_2_1$FIELD_year))
+number_of_locations = length(unique(early_silage_2_1$field))
+#number_of_plots = length(unique(early_silage_2_1$unique_plot_id))
+ 
+model_lm = lm(SYLDFR_TN_HA~plant_density+ I(plant_density^2)+ I(yield_env)+ I(yield_env*plant_density),data=early_silage_2_1)
+ 
+print(summary(model_lm))
+#mean_field_yield_method_4
+ 
+parameters_reg = as.data.frame(t(summary(model_lm)$coefficients))
+#lm_parameters = as.data.frame(t(summary(model_lm)$coefficients))
+  a = parameters_reg$`(Intercept)`[1]
+  b = parameters_reg$plant_density[1]
+  c = parameters_reg$`I(plant_density^2)`[1]
+  d = parameters_reg$`I(yield_env)`[1]
+ e = parameters_reg$`I(yield_env * plant_density)`[1]
+   pval_b = parameters_reg$plant_density[4]
+  pval_c = parameters_reg$`I(plant_density^2)`[4]
+  pval_d = parameters_reg$`I(yield_env)`[4]
+  pval_e = parameters_reg$`I(yield_env * plant_density)`[4]
+#print(summary(model_lm))
+print(summary(model_lm)$adj.r.squared)
+ 
+parameters_df = data.frame(hybrid_name=hybrids[i],intercept=a, coeff_density=b, coeff_density_sqr=c,coeff_ye=d,coeff_ye_density=e,pvalue_density_coeff=pval_b,pvalue_density_sqr_coeff=pval_c,r_2=summary(model_lm)$r.squared,adj_r_2=summary(model_lm)$adj.r.squared, pvalue_ye=pval_d,pvalue_ye_density=pval_e)
+ 
+early_silage_2_1$predicted_df <- predict(model_lm, early_silage_2_1)
+ 
+#early_silage_2_1_1 = filter(early_silage_2_1, mean_field_yield == min(early_silage_2_1$mean_field_yield) | mean_field_yield == max(early_silage_2_1$mean_field_yield) | mean_field_yield == median(early_silage_2_1$mean_field_yield) )
+ 
+# this is the predicted line of multiple linear regression
+ 
+# model_df = model_df %>% mutate(optimal_density = -coeff_density/(2*coeff_density_sqr),
+#     yld_max = intercept + coeff_density*optimal_density + coeff_density_sqr*optimal_density^2,economic_density = (-1)*(coeff_density-0.023)/(2*coeff_density_sqr),yld_eco = intercept + coeff_density*economic_density + coeff_density_sqr*economic_density^2)
+all_parameters_df = rbind(all_parameters_df,parameters_df)
+}
+
+points_data_pmt2_with_ye_for_instinct_summary_ye = points_data_pmt2_with_ye_for_instinct %>% group_by(hybrid_name) %>% summarise(min_ye = min(yield_env),max_ye=max(yield_env),round_min_ye=round(min_ye,0), round_max_ye=round(max_ye,0))
+
+
+#early_silage_2_1_summary = instinct_data_aman %>% group_by(hybrid) %>% summarise(low_ye=12,low_mid_ye=6,mid_ye=8,mid_high_ye=10,high_ye=14)
+
+#early_silage_2_1_summary = instinct_data_aman %>% group_by(hybrid) %>% summarise(low_ye=12,high_ye=14)
+
+
+#names(early_silage_2_1_summary)[1] = "hybrid_name"
+ 
+
+
+hyd.len = length(hybrids)
+final.bin1.table = NULL
+for(i in sequence(hyd.len)){
+  #temp = data.hy.sub %>% filter(Hybrid==hybrids[i])
+  temp = points_data_pmt2_with_ye_for_instinct_summary_ye %>% filter(hybrid_name==hybrids[i])
+  YE = seq(temp$round_min_ye,temp$round_max_ye,1)
+  #### Made the following change to keep the yield range same as Joo Yoon 3T/Ha to 20T/Ha, commented the previous line
+  #YE = seq(3,20,1)
+  bin1_table = temp
+  for(j in 1:(length(YE)-1)){
+    bin1_table = rbind(bin1_table,temp)
+  }
+  bin1_table$YE = YE
+  final.bin1.table = rbind(final.bin1.table,bin1_table)
+}
+
+lm_test_data = final.bin1.table[,c(1,6)]
+
+lm_test_data_1= lm_test_data%>% crossing(plant_density = seq(70,180,1))
+
+names(lm_test_data_1)[2] = "yield_env"
+#lm_test_data_long = lm_test_data %>% gather(ye_level,mean_field_yield, 2:3)
+all_parameters_df = filter(all_parameters_df, coeff_density_sqr<0)
+
+lm_test_data_1 = inner_join(lm_test_data_1,all_parameters_df)
+ 
+#lm_test_data_long$predicted_yield=predict(model_lm,lm_test_data_long)
+ 
+lm_test_data_1 = lm_test_data_1 %>% mutate(predicted_yield=intercept+coeff_density*plant_density+coeff_density_sqr*plant_density*plant_density+coeff_ye*yield_env+coeff_ye_density*yield_env*plant_density)
+ 
+#domino.science-at-scale.io/u/adatt/EMEA_Corn_Grain_Density_Modelling/view/EMEA_2018-2019_corn_grain_MDmodel.R
+ 
+ 
+lm_test_data_2 = lm_test_data_1 %>% mutate(optimal_density = -(coeff_density+yield_env*coeff_ye_density)/(2*coeff_density_sqr),
+    yld_max = intercept + coeff_density*optimal_density + coeff_density_sqr*optimal_density^2+coeff_ye*yield_env+coeff_ye_density*yield_env*optimal_density,economic_density = (-1)*(coeff_density-0.023+yield_env*coeff_ye_density)/(2*coeff_density_sqr),yld_eco = intercept + coeff_density*economic_density + coeff_density_sqr*economic_density^2+coeff_ye*yield_env+coeff_ye_density*yield_env*economic_density)
+
+#domino.science-at-scale.io/u/jdmuno/PopCornDKC/view/app.R
+getOpt <- function(df, CP, SC){
+  # CP - commodity price
+  # SC - seed cost
+  df$AgOpt = - (df$b_pop + (df$e_ye_pop * df$YE)) / (2*df$c_pop_sq)
+  df$Yld_AgOpt = df$a_intcpt + df$AgOpt * df$b_pop + df$AgOpt**2 *df$c_pop_sq + df$YE * df$d_ye + df$YE * df$AgOpt * df$e_ye_pop
+  df$EcOpt = (SC * 1/80000 * 1000 - df$e_ye_pop*df$YE*CP - df$b_pop*CP) / (2* df$c_pop_sq*CP)
+  df$Yld_EcOpt = df$a_intcpt + df$EcOpt * df$b_pop + df$EcOpt**2 *df$c_pop_sq + df$YE * df$d_ye + df$YE * df$EcOpt * df$e_ye_pop
+  df$EcOpt[(df$EcOpt < df$min_pop * 0.9) | (df$EcOpt > df$max_pop * 1.1)] <- NA
+  df$Yld_EcOpt[is.na(df$EcOpt)] <- NA
+  return(df)
+}
+
+SC=6500
+CP=4000
+
+lm_test_data_2 = lm_test_data_2 %>% mutate(b_star = coeff_density+coeff_ye_density*yield_env,c_star=coeff_density_sqr,a_star = intercept+coeff_ye*yield_env,EcOpt = (SC * 1/80000 * 1000 - coeff_ye_density*yield_env*CP - coeff_density*CP) / (2* coeff_density_sqr*CP),
+  Yld_EcOpt = intercept + EcOpt * coeff_density + EcOpt**2 *coeff_density_sqr + yield_env * coeff_ye + yield_env * EcOpt * coeff_ye_density) 
+ 
+ 
+
+
+optimal_density = unique(lm_test_data_2[,c(1,2,16,17)])
+names(optimal_density)[3] = "plant_density"
+names(optimal_density)[4] = "predicted_yield"
+optimal_density$density_type="Optimal density"
+ 
+economic_density = unique(lm_test_data_2[,c(1,2,18,19)])
+names(economic_density)[3] = "plant_density"
+names(economic_density)[4] = "predicted_yield"
+economic_density$density_type="Slope constrained economic density"
+
+cost_economic_density = unique(lm_test_data_2[,c(1,2,23,24)])
+names(cost_economic_density)[3] = "plant_density"
+names(cost_economic_density)[4] = "predicted_yield"
+cost_economic_density$density_type="Seed cost constrained economic density"
+ 
+#cost_economic_density = unique(lm_test_data_long[,c(1,3,4,24,25)])
+#names(cost_economic_density)[4] = "plant_density"
+#names(cost_economic_density)[5] = "predicted_yield"
+#cost_economic_density$density_type="Seed cost constrained economic density"
+
+#lm_test_data_2$analysis_type = analysis_type
+ 
+optimal_density_1 = rbind(optimal_density,economic_density,cost_economic_density)
+
+#Post density curve QC
+optimal_density_2 = optimal_density_1 %>% filter(density_type=="Optimal density")
+
+optimal_density_2 = optimal_density_2 %>% group_by(hybrid_name) %>% mutate(rank_ye=rank(yield_env))
+
+optimal_density_3 = optimal_density_2 %>% group_by(hybrid_name) %>% mutate(min_ye_level=min(rank_ye), max_ye_level=max(rank_ye))
+
+optimal_density_3_min = optimal_density_3 %>% filter(rank_ye==min_ye_level)
+
+optimal_density_3_max = optimal_density_3 %>% filter(rank_ye==max_ye_level)
+
+optimal_density_3_all = rbind(optimal_density_3_min,optimal_density_3_max)
+
+optimal_density_3_all = optimal_density_3_all %>% mutate(opt_density_type = ifelse(rank_ye==1,"min_opt_density","max_opt_density")) %>% select(hybrid_name,opt_density_type,predicted_yield) 
+
+optimal_density_3_all = unique(optimal_density_3_all)
+
+optimal_density_3_all %>%
+    spread(opt_density_type, predicted_yield) %>%
+    mutate("Difference" = max_opt_density - min_opt_density) 
+
+optimal_density_3_all_1 = optimal_density_3_all%>% group_by(hybrid_name)%>% tidyr::spread(opt_density_type,predicted_yield) %>% mutate(difference=max_opt_density-min_opt_density, curve_quality=ifelse(difference>0,"normal","abnormal"))
+
+hybrids = filter(optimal_density_3_all_1,curve_quality=="normal")$hybrid_name
+
+all_parameters_df_1 = inner_join(all_parameters_df,points_data_pmt2_with_ye_for_instinct_summary)
+
+all_parameters_df_1 = filter(all_parameters_df_1, hybrid_name %in% hybrids)
+
+hybrids_final = unique(all_parameters_df_1$hybrid_name)
+
+# defining confidence levels
+
+all_parameters_df_1 = all_parameters_df_1 %>% mutate(two_seasons_tested = ifelse(number_of_seasons>1, "TRUE", "FALSE"), atleast_ten_locations_tested= ifelse(number_of_locations>=10, "TRUE", "FALSE"),atleast_five_locations_tested= ifelse(number_of_locations>=5, "TRUE", "FALSE"),atleast_three_locations_tested= ifelse(number_of_locations>=3, "TRUE", "FALSE"))
+ 
+all_parameters_df_1 = all_parameters_df_1 %>% mutate(r2_atleast_0.8 = ifelse(adj_r_2>=0.8, "TRUE", "FALSE"), r2_atleast_0.6= ifelse(adj_r_2>=0.6, "TRUE", "FALSE"),r2_atleast_0.4= ifelse(adj_r_2>=0.4, "TRUE", "FALSE"),r2_atleast_0.2= ifelse(adj_r_2>=0.2, "TRUE", "FALSE"))
+
+confidence_unique_levels = unique(all_parameters_df_1[,c(18:25)])
+
+#defining confidence_level
+
+
+
+#write_csv(confidence_unique_levels,"/mnt/data/confidence_unique_levels.csv")
+
+#confidence_level_def = read_csv("/mnt/data/confidence__levels_definition_grain_dit.csv")
+
+#confidence_level_def = confidence_level_def %>% unite(flags_combined, two_seasons_tested,atleast_ten_locations_tested,atleast_five_locations_tested,atleast_three_locations_tested,r2_atleast_0.8,r2_atleast_0.6,r2_atleast_0.4,r2_atleast_0.2, sep="__",remove=F)
+#confidence_level_def_1 = confidence_level_def[,c(1,10)]
+ 
+#defining confidence levels for hybrids tested for 2 seasons
+
+#two_seasons_tested	atleast_ten_locations_tested	atleast_five_locations_tested	atleast_three_locations_tested	r2_atleast_0.8	r2_atleast_0.6	r2_atleast_0.4	r2_atleast_0.2
+#TRUE	TRUE	TRUE	TRUE	TRUE	TRUE	TRUE	TRUE	Very high
+
+#all_parameters_df_1 = all_parameters_df_1 %>% unite(flags_combined, two_seasons_tested,atleast_ten_locations_tested,atleast_five_locations_tested,atleast_three_locations_tested,r2_atleast_0.8,r2_atleast_0.6,r2_atleast_0.4,r2_atleast_0.2, sep="__",remove=F)
+
+#all_parameters_df_1 = inner_join(all_parameters_df_1,confidence_level_def_1)
+
+all_parameters_df_1 = all_parameters_df_1 %>% mutate(confidence_level = ifelse(two_seasons_tested=="FALSE" & r2_atleast_0.6 == "TRUE","medium","low"))
+
+all_parameters_df_1 = all_parameters_df_1 %>% mutate(confidence_level = ifelse(two_seasons_tested=="TRUE" ,"medium",confidence_level))
+
+all_parameters_df_1_normal = filter(all_parameters_df_1, hybrid_name %in% hybrids_final)
+
+#all_parameters_df_1_normal = all_parameters_df_1
+
+lm_test_data_2_normal = filter(lm_test_data_2, hybrid_name %in% hybrids_final)
+
+# lm_test_data_2_normal = lm_test_data_2
+#data = filter(lm_test_data_2, hybrid_name=="DKC77-26BR")
+#opt_data = filter(optimal_density_1, hybrid_name=="DKC77-26BR")
+#summary_data = filter(all_parameters_df_1,hybrid_name=="DKC77-26BR")
+ 
+#
+
+hybrids = unique(lm_test_data_2_normal$hybrid_name)
+
+for(i in 1:length(hybrids)){
+  print(hybrids[i])
+  
+  data = filter(lm_test_data_2_normal, hybrid_name==hybrids[i])
+opt_data = filter(optimal_density_1, hybrid_name==hybrids[i])
+summary_data = filter(all_parameters_df_1_normal,hybrid_name==hybrids[i])
+ 
+plot_model_1=ggplot(data, aes(x = plant_density, y = predicted_yield, color=as.factor(yield_env))) +
+  geom_line( aes(x=plant_density, y=predicted_yield,color=as.factor(yield_env)))+ggtitle(paste(hybrids[i],"- Density curve",sep=""))+facet_wrap(~hybrid_name)+geom_point(data=opt_data,aes(x=plant_density,y=predicted_yield,shape=density_type),size=3)+xlab("Planting Density (1K seeds/ha)")+ylab("SYLDFR Yield (t/ha)")+labs(title = paste("Hybrid = ", hybrids[i],"; ","Seasons = ",summary_data$number_of_seasons,"; ","locations = ",summary_data$number_of_locations,";","plots = ", summary_data$number_of_plots,"; ","points = ", summary_data$number_of_points,"; ","Adj R2 = ",round(data$adj_r_2[1],2),"; ","Conf level = ",summary_data$confidence_level,sep=""))+ggsave(paste("/mnt/field_reports_2025/instinct_results/eme_silage/all_data/SYLDFR/density_curves/",hybrids[i], "_","SYLDFR_INSTINCT_density_curve",".pdf",sep=""), width = 25, height = 20, units = "cm")
+
+
+print(plot_model_1)
+  
+}
+
+
+
+##not normal density curves
+hybrids_weird = filter(optimal_density_3_all_1,!curve_quality=="normal")$hybrid_name
+
+for(i in 1:length(hybrids_weird)){
+  print(hybrids_weird[i])
+  
+  data = filter(lm_test_data_2, hybrid_name==hybrids_weird[i])
+opt_data = filter(optimal_density_1, hybrid_name==hybrids_weird[i])
+summary_data = filter(all_parameters_df_1,hybrid_name==hybrids_weird[i])
+ 
+plot_model_1=ggplot(data, aes(x = plant_density, y = predicted_yield, color=as.factor(yield_env))) +
+  geom_line( aes(x=plant_density, y=predicted_yield,color=as.factor(yield_env)))+ggtitle(paste(hybrids[i],"- Density curve",sep=""))+facet_wrap(~hybrid_name)+geom_point(data=opt_data,aes(x=plant_density,y=predicted_yield,shape=density_type),size=3)+xlab("Planting Density (1K seeds/ha)")+ylab("SYLDFR Yield (t/ha)")+labs(title = paste("Hybrid = ", hybrids_weird[i],"; ","Seasons = ",summary_data$number_of_seasons,"; ","locations = ",summary_data$number_of_locations,";","plots = ", summary_data$number_of_plots,"; ","points = ", summary_data$number_of_points,"; ","Adj R2 = ",round(data$adj_r_2[1],2),"; ","Confidence level = ",summary_data$confidence_level,sep=""))+ggsave(paste("/mnt/field_reports_2025/instinct_results/eme_silage/all_data/SYLDFR/not_normal_density_curves/",hybrids_weird[i], "_","INSTINCT_density_curve",".pdf",sep=""), width = 25, height = 20, units = "cm")
+
+
+print(plot_model_1)
+  
+}
+
+
+exclude = c("DKC3327","DKC3418")
+lm_test_data_2 = filter(lm_test_data_2, !hybrid_name %in% exclude)
+hybrids = unique(lm_test_data_2$hybrid_name)
+flexibility_df = data.frame()
+ 
+ 
+for(i in 1:length(hybrids)){
+  g=hybrids[i]
+  print(g)
+  dati <- dplyr::filter(lm_test_data_2, hybrid_name == g)
+  ye_levels = unique(dati$yield_env)
+  yield_levels_df = data.frame()
+  for(j in 1:length(ye_levels)){
+  h=ye_levels[j]
+  dati_1 <- dplyr::filter(dati, yield_env == h)
+  mi <- nls(predicted_yield ~ plant_density / (a + b * plant_density), data=dati_1, start=list(a=10,b=1),nls.control(maxiter = 500, tol = 1e-05, minFactor = 1/1024,
+            printEval = FALSE, warnOnly = FALSE))
+  #print(summary(mi))
+  out <- mi$m$getPars()
+  out$hybrid_name = g
+  out$ye_level = h
+  out=as.data.frame(out)
+  pred <- predict(mi)
+  n <- length(pred)
+  res <- resid(mi)
+  w <- weights(mi)
+  if (is.null(w)) w <- rep(1, n)
+  rss <- sum(w * res ^ 2)
+  resp <- pred + res
+  center <- weighted.mean(resp, w)
+  r.df <- summary(mi)$df[2]
+  int.df <- 1
+  tss <- sum(w * (resp - center)^2)
+  r.sq <- 1 - rss/tss
+  adj.r.sq <- 1 - (1 - r.sq) * (n - int.df) / r.df
+  out$pseudo.R.squared=r.sq
+  out$adj.r.sq=adj.r.sq
+  yield_levels_df  = rbind(yield_levels_df ,out)
+  }
+  flexibility_df  = rbind(flexibility_df ,yield_levels_df)
+}
+ 
+flexibility_df  = mutate(flexibility_df , flexibility = a/b)#, normalized_flexibility= flexibility/model_results$flexibility, rounded_norm_flex= round(normalized_flexibility,0))
+ 
+flexibility_df = flexibility_df %>% mutate(flexibility_class = ifelse(flexibility<=(-10),"1:Strong flex",ifelse(flexibility>-10 & flexibility<=(0),"2:More flex",ifelse(flexibility>0 & flexibility<=10 ,"3:Average",ifelse(flexibility>10 & flexibility<=20 ,"4:More fix",ifelse(flexibility>20,"5:Strong fix","NA"))))))
+
+
+#instinct_data_model_parameters_grain_ssc = instinct_data_model_parameters_grain_ssc %>% mutate(confidence_level_density = ifelse(pvalue_density_coeff <0.05 & pvalue_density_sqr_coeff <0.05, "High",ifelse(pvalue_density_coeff %in% c(0.01:0.05) & pvalue_density_sqr_coeff %in% c(0.01:0.05),"Medium","Low")))
+
+flexibility_df = flexibility_df %>% mutate(rsquared_greater_0.6=ifelse(adj.r.sq>0.6,"TRUE","FALSE"))
+flexibility_df = flexibility_df %>% mutate(rsquared_greater_0.3=ifelse(adj.r.sq>0.3,"TRUE","FALSE"))
+
+
+flexibility_df = flexibility_df %>% mutate(confidence_level_flexibility = ifelse(rsquared_greater_0.6 == "TRUE" , "High",ifelse(rsquared_greater_0.6 == "FALSE" & rsquared_greater_0.3 == "TRUE", "Medium", "Low")))
+
+
+
+
+#lm_test_data_2_ondrej= lm_test_data_2
+#flexibility_df_ondrej= flexibility_df
+#opt_data_ondrej= optimal_density_1
+
+lm_test_data_2_syldfr= lm_test_data_2
+flexibility_df_syldfr= flexibility_df
+opt_data_syldfr= optimal_density_1
+all_parameters_df_1_normal_syldfr= all_parameters_df_1_normal
+
+
+flexibility_df_syldfr$trait = "silage_fresh_yield"
+opt_data_syldfr$trait = "silage_fresh_yield"
+all_parameters_df_1_normal_syldfr$trait = "silage_fresh_yield"
+```
+
+# save the data
+
+```{r}
+
+flexibility_df_syldfr$trait = "silage_fresh_yield"
+opt_data_syldfr$trait = "silage_fresh_yield"
+all_parameters_df_1_normal_syldfr$trait = "silage_fresh_yield"
+
+flexibility_df_all = rbind(flexibility_df_syld,flexibility_df_syldfr)
+opt_data_all = rbind(opt_data_syld,opt_data_syldfr)
+
+all_parameters_df_1_normal_all = rbind(all_parameters_df_1_normal_syld,all_parameters_df_1_normal_syldfr)
+
+
+#optimal_density_1 = filter(optimal_density_1, !hybrid_name %in% c("DKC6492","DKC3088","DKC3719"))
+
+
+flexibility_df_all$crop = "Corn-Silage"
+
+ssc_hybrids = c("EW6015XKL1","EW6436XKL1","EW6846XKL1","EW6846XKLZ","EW6015XKLZ","EW6436XKLZ","EW6846XKL1","EX6658XKL1","EX7031XKL1","EX7210XKL1","EX6658XKL1","EY3340XKL1","DKC6646SC","DKC6648SC","DKC6651SC","EZ6857XKL1","EZ7211XKL1")
+
+flexibility_df_all = flexibility_df_all %>% mutate(hybrid_type = ifelse(hybrid_name %in% ssc_hybrids, "Smart corn", "Tall hybrid"))
+
+
+#points_data_pmt2_with_ye_for_instinct_summary$hybrid_type = "PS4 Conventional-tall"
+#flexibility_df_all$trait = "grain_yield"
+flexibility_df_all$trial_type = "Geo-spatial large plot DIT trials"
+flexibility_df_all$region = "EME"
+
+
+all_parameters_df_1_normal_all$crop = "Corn-Silage"
+
+#ssc_hybrids = c("EW6015XKL1","EW6436XKL1","EW6846XKL1","EW6846XKLZ","EW6015XKLZ","EW6436XKLZ","EW6846XKL1","EX6658XKL1")
+
+all_parameters_df_1_normal_all = all_parameters_df_1_normal_all %>% mutate(hybrid_type = ifelse(hybrid_name %in% ssc_hybrids, "Smart corn", "Tall hybrid"))
+
+
+#points_data_pmt2_with_ye_for_instinct_summary$hybrid_type = "PS4 Conventional-tall"
+#flexibility_df_all$trait = "grain_yield"
+all_parameters_df_1_normal_all$trial_type = "Geo-spatial large plot DIT trials"
+all_parameters_df_1_normal_all$region = "EME"
+
+
+
+opt_data_all$crop = "Corn-Silage"
+
+#ssc_hybrids = c("EW6015XKL1","EW6436XKL1","EW6846XKL1","EW6846XKLZ","EW6015XKLZ","EW6436XKLZ","EW6846XKL1","EX6658XKL1")
+
+opt_data_all = opt_data_all %>% mutate(hybrid_type = ifelse(hybrid_name %in% ssc_hybrids, "Smart corn", "Tall hybrid"))
+
+
+#points_data_pmt2_with_ye_for_instinct_summary$hybrid_type = "PS4 Conventional-tall"
+#flexibility_df_all$trait = "grain_yield"
+opt_data_all$trial_type = "Geo-spatial large plot DIT trials"
+opt_data_all$region = "EME"
+
+#write_csv(all_parameters_df_1_normal_all,"/mnt/field_reports_2023/instinct_version_2_density_curves/rsa_instinct_data_updated/rsa_comparison_instinct_density_curve_plotting_data.csv")
+opt_data_all = filter(opt_data_all, trait=="silage_dry_yield")
+opt_data_all_1 = filter(opt_data_all, density_type =="Optimal density" & plant_density<160)
+
+opt_data_all_1 = opt_data_all_1 %>% unite(hybrid_yield_env, hybrid_name,yield_env, remove=F)
+opt_data_all = opt_data_all %>% unite(hybrid_yield_env, hybrid_name,yield_env, remove=F)
+
+opt_data_all = filter(opt_data_all, hybrid_yield_env %in% opt_data_all_1$hybrid_yield_env)
+
+opt_data_all$hybrid_yield_env = NULL
+
+write_csv(opt_data_all,"/mnt/field_reports_2025/instinct_results//eme_silage/all_data/result_files/eme_dit_silage_instinct_opt_density_values_data_11thFeb2026.csv")
+write_csv(flexibility_df_all,"/mnt/field_reports_2025/instinct_results//eme_silage/all_data/result_files/eme_dit_silage_comparison_instinct_flexibility_11thFeb2026.csv")
+
+
+write_csv(all_parameters_df_1_normal_all,"/mnt/field_reports_2025/instinct_results//eme_silage/all_data/result_files/eme_dit_silage_hybrids_model_parameters_11thFeb2026.csv")
+```
+
